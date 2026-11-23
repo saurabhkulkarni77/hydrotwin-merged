@@ -286,7 +286,323 @@
     "<li>Gas: EIA Henry Hub daily spot (all regions)</li>";
   $("nb-limits").innerHTML = R.limitations.map(t => "<li>" + t + "</li>").join("");
 
-  function drawAll() { drawHistory(); drawMoving(); drawOutlook(); drawLead(); drawFeatimp(); drawCorr(); }
+  /* ---------- weekly / monthly outlooks ---------- */
+  function outlookBlock(O, cvId, tblId, fcId, unit) {
+    const cv = $(cvId); const [ctx, W, H] = setup(cv, 250);
+    const pad = { l: 52, r: 10, t: 10, b: 22 };
+    const ser = O.series, fc = O.forecast;
+    const all = ser.map(p => p.v).concat(fc.map(f => f.hi), fc.map(f => f.lo));
+    let ymin = Math.min(...all), ymax = Math.max(...all);
+    const mg = (ymax - ymin) * 0.08 || 1; ymin -= mg; ymax += mg;
+    axes(ctx, W, H, pad, ymin, ymax, "$/MWh");
+    const X0 = pad.l, X1 = W - pad.r, Y0 = pad.t, Y1 = H - pad.b, N = ser.length + fc.length;
+    const fx = i => i / (N - 1), fy = v => (v - ymin) / (ymax - ymin);
+    const hi = ser.findIndex(p => p.d >= O.holdout_start);
+    if (hi > 0) {
+      const x = X0 + (X1 - X0) * fx(hi);
+      ctx.fillStyle = "rgba(255,210,77,.07)"; ctx.fillRect(x, Y0, X1 - x, Y1 - Y0);
+      ctx.fillStyle = GOLD; ctx.font = "11px Arial"; ctx.fillText("holdout →", x + 4, Y0 + 12);
+    }
+    ctx.fillStyle = "rgba(67,209,124,.13)"; ctx.beginPath();
+    fc.forEach((f, i) => { const x = X0 + (X1 - X0) * fx(ser.length + i), y = Y1 - (Y1 - Y0) * fy(f.hi); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    [...fc].reverse().forEach((f, i) => { const x = X0 + (X1 - X0) * fx(ser.length + fc.length - 1 - i), y = Y1 - (Y1 - Y0) * fy(f.lo); ctx.lineTo(x, y); });
+    ctx.closePath(); ctx.fill();
+    line(ctx, ser.map((p, i) => [fx(i), fy(p.v)]), X0, X1, Y0, Y1, BLUE, 1.4);
+    line(ctx, [[fx(ser.length - 1), fy(ser[ser.length - 1].v)]].concat(fc.map((f, i) => [fx(ser.length + i), fy(f.pred)])), X0, X1, Y0, Y1, GREEN, 1.8);
+    ctx.fillStyle = GREY; ctx.font = "11px Arial";
+    ctx.fillText(ser[0].d, X0, H - 6); ctx.fillText(fc[fc.length - 1].date, X1 - 62, H - 6);
+    $(tblId).innerHTML =
+      "<tr><th>Horizon</th><th>Model</th><th>MAE $</th><th>RMSE $</th><th>R²</th><th>Persistence MAE $</th><th>Skill vs persistence</th><th>n</th></tr>" +
+      Object.keys(O.metrics).sort((a, b) => a - b).map(h => {
+        const m = O.metrics[h];
+        return m ? `<tr><td>+${h}${unit}</td><td>${m.chosen}</td><td>${fmt(m.mae)}</td><td>${fmt(m.rmse)}</td><td>${fmt(m.r2, 3)}</td><td>${fmt(m.pers_mae)}</td><td>${fmt(m.skill_pct, 1)}%</td><td>${m.n}</td></tr>`
+                 : `<tr><td>+${h}${unit}</td><td colspan="7">not enough origins to score honestly</td></tr>`;
+      }).join("");
+    $(fcId).innerHTML = "<tr><th>Period starting</th><th>Forecast $/MWh</th><th>Band low</th><th>Band high</th></tr>" +
+      fc.map(f => `<tr><td>${f.date}</td><td>${fmt(f.pred)}</td><td>${fmt(f.lo)}</td><td>${fmt(f.hi)}</td></tr>`).join("");
+  }
+  function drawOutlooks() {
+    outlookBlock(E.outlooks.weekly, "cv-weekly", "wk-tbl", "wk-fc", " wk");
+    outlookBlock(E.outlooks.monthly, "cv-monthly", "mo-tbl", "mo-fc", " mo");
+    $("wk-ho").textContent = "holdout from " + E.outlooks.weekly.holdout_start +
+      ", " + E.outlooks.weekly.n_periods + " weeks in the record";
+    $("mo-ho").textContent = "holdout from " + E.outlooks.monthly.holdout_start +
+      ", " + E.outlooks.monthly.n_periods + " months in the record";
+  }
+
+  /* ---------- yearly climatology outlook ---------- */
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function drawYearly() {
+    const Y = E.outlooks.yearly, O = Y.outlook;
+    const cv = $("cv-yearly"); const [ctx, W, H] = setup(cv, 250);
+    const pad = { l: 52, r: 10, t: 10, b: 22 };
+    const all = O.flatMap(o => [o.p75, o.p25]).filter(v => v !== null);
+    let ymin = Math.min(...all), ymax = Math.max(...all);
+    const mg = (ymax - ymin) * 0.1 || 1; ymin -= mg; ymax += mg;
+    axes(ctx, W, H, pad, ymin, ymax, "$/MWh");
+    const X0 = pad.l, X1 = W - pad.r, Y0 = pad.t, Y1 = H - pad.b;
+    const fx = i => i / (O.length - 1), fy = v => (v - ymin) / (ymax - ymin);
+    ctx.fillStyle = "rgba(255,210,77,.15)"; ctx.beginPath();
+    O.forEach((o, i) => { const x = X0 + (X1 - X0) * fx(i), y = Y1 - (Y1 - Y0) * fy(o.p75); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    [...O].reverse().forEach((o, i) => { const x = X0 + (X1 - X0) * fx(O.length - 1 - i), y = Y1 - (Y1 - Y0) * fy(o.p25); ctx.lineTo(x, y); });
+    ctx.closePath(); ctx.fill();
+    line(ctx, O.map((o, i) => [fx(i), fy(o.mean)]), X0, X1, Y0, Y1, GOLD, 1.9);
+    ctx.fillStyle = GREY; ctx.font = "11px Arial";
+    O.forEach((o, i) => { if (i % 2 === 0) ctx.fillText(MON[o.month - 1] + " " + o.date.slice(0, 4), X0 + (X1 - X0) * fx(i) - 18, H - 6); });
+    $("yr-tbl").innerHTML =
+      "<tr><th>Calendar month</th><th>Mean $/MWh</th><th>Median</th><th>P25</th><th>P75</th><th>Year to year std</th><th>Years of data</th></tr>" +
+      MON.map((mn, i) => { const c = Y.clim[String(i + 1)];
+        return c ? `<tr><td>${mn}</td><td>${fmt(c.mean)}</td><td>${fmt(c.median)}</td><td>${fmt(c.p25)}</td><td>${fmt(c.p75)}</td><td>${fmt(c.std)}</td><td>${c.n_years} (${c.years.join(", ")})</td></tr>`
+                 : `<tr><td>${mn}</td><td colspan="6">no complete month in the record</td></tr>`; }).join("");
+    $("yr-note").textContent =
+      "This yearly outlook is a climatology, not a fitted model. Each future month is priced at the average of that " +
+      "calendar month across the " + Y.years.length + " calendar years in this record (" + Y.first + " to " + Y.last + " — a span of about " +
+      (Math.round((new Date(Y.last) - new Date(Y.first)) / 864e5 / 365.25 * 10) / 10) + " years, against the river twin's 25). " +
+      "The band is the middle half of those years (25th to 75th percentile): with so few years it is the spread of what " +
+      "actually happened, not a confidence interval. Leave-one-year-out check of this climatology — predicting each year " +
+      "from only the years before it: " + Y.folds.map(f => f.year + " MAE $" + fmt(f.mae) + " over " + f.n_months + " months").join("; ") +
+      "; overall MAE $" + fmt(Y.loyo_mae) + "/MWh. Treat the outlook as a seasonal guide, not a forecast with daily model accuracy.";
+  }
+
+  /* ---------- tiny orbit 3D engine (canvas 2D, painter's algorithm) ------ */
+  function orbit3d(cv, tip, draw, opts) {
+    const st = Object.assign({ az: -0.65, el: 0.55, zoom: 1.0 }, opts || {});
+    let hover = [];
+    function render() {
+      const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      const W = Math.max(300, r.width), H = 440;
+      cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + "px";
+      const ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, W, H);
+      const caz = Math.cos(st.az), saz = Math.sin(st.az), cel = Math.cos(st.el), sel = Math.sin(st.el);
+      const S = Math.min(W, H) * 1.04 * st.zoom;
+      function proj(p) {
+        const x = p[0] - 0.5, y = p[1], z = p[2] - 0.5;
+        const x1 = x * caz - z * saz, z1 = x * saz + z * caz;
+        const y1 = y * cel - z1 * sel, z2 = y * sel + z1 * cel;
+        const persp = 1 / (1 + z2 * 0.3);
+        return [W / 2 + x1 * S * persp, H * 0.86 - y1 * S * persp, z2];
+      }
+      hover = [];
+      draw(ctx, proj, W, H, (sx, sy, text) => hover.push([sx, sy, text]));
+    }
+    let drag = null;
+    cv.addEventListener("pointerdown", e => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener("pointermove", e => {
+      if (drag) {
+        st.az += (e.clientX - drag[0]) * 0.008;
+        st.el = Math.min(1.35, Math.max(0.15, st.el + (e.clientY - drag[1]) * 0.006));
+        drag = [e.clientX, e.clientY]; render(); return;
+      }
+      const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      let best = null, bd = 20;
+      hover.forEach(h => { const d = Math.hypot(h[0] - mx, h[1] - my); if (d < bd) { bd = d; best = h; } });
+      if (best) {
+        tip.style.display = "block"; tip.textContent = best[2];
+        tip.style.left = Math.min(r.width - 190, best[0] + 12) + "px";
+        tip.style.top = Math.max(2, best[1] - 32) + "px";
+      } else tip.style.display = "none";
+    });
+    cv.addEventListener("pointerup", () => { drag = null; });
+    cv.addEventListener("pointerleave", () => { tip.style.display = "none"; });
+    cv.addEventListener("wheel", e => {
+      e.preventDefault();
+      st.zoom = Math.min(2.6, Math.max(0.5, st.zoom * (e.deltaY > 0 ? 0.9 : 1.11)));
+      render();
+    }, { passive: false });
+    return { render };
+  }
+  function grid3(ctx, proj) {
+    ctx.strokeStyle = "rgba(70,95,125,.5)"; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const t = i / 4;
+      let a = proj([t, 0, 0]), b = proj([t, 0, 1]);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+      a = proj([0, 0, t]); b = proj([1, 0, t]);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    }
+  }
+  function quad(ctx, pts, fill, stroke) {
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 0.6; ctx.stroke(); }
+  }
+  const ramp = t => { // blue -> teal -> gold -> red
+    const stops = [[68, 116, 196], [46, 155, 87], [255, 210, 77], [255, 90, 70]];
+    const x = Math.min(0.999, Math.max(0, t)) * 3, i = Math.floor(x), f = x - i;
+    const c = stops[i].map((v, k) => Math.round(v + (stops[i + 1][k] - v) * f));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+  };
+
+  /* ---------- forecast surface 3D ---------- */
+  const surfCtl = orbit3d($("cv-surface"), $("tip-surface"), (ctx, proj, W, H, addHover) => {
+    const Sf = E.surface, vals = [];
+    Sf.pred.forEach(row => row.forEach(v => { if (v !== null) vals.push(v); }));
+    const vmin = Math.min(...vals), vmax = Math.max(...vals);
+    const ny = v => (v - vmin) / ((vmax - vmin) || 1) * 0.58;
+    grid3(ctx, proj);
+    const node = (i, j) => Sf.pred[i][j] === null ? null : proj([i / 11, ny(Sf.pred[i][j]), j / 6]);
+    const quads = [];
+    for (let i = 0; i < 11; i++) for (let j = 0; j < 6; j++) {
+      const c = [node(i, j), node(i + 1, j), node(i + 1, j + 1), node(i, j + 1)];
+      if (c.some(p => p === null)) continue;
+      const avg = (Sf.pred[i][j] + Sf.pred[i + 1][j] + Sf.pred[i + 1][j + 1] + Sf.pred[i][j + 1]) / 4;
+      quads.push({ c, d: c.reduce((a, p) => a + p[2], 0) / 4, v: avg, i, j });
+    }
+    quads.sort((a, b) => b.d - a.d);
+    quads.forEach(q => {
+      quad(ctx, q.c, ramp((q.v - vmin) / ((vmax - vmin) || 1)), "rgba(10,18,28,.35)");
+      const cx = q.c.reduce((a, p) => a + p[0], 0) / 4, cy = q.c.reduce((a, p) => a + p[1], 0) / 4;
+      addHover(cx, cy, MON[q.i] + " origins · +" + (q.j + 1) + "d · mean forecast " + money(Sf.pred[q.i][q.j]) +
+        " · mean actual " + money(Sf.actual[q.i][q.j]) + " · MAE " + money(Sf.mae[q.i][q.j]) +
+        " · " + Sf.n[q.i][q.j] + " origins");
+    });
+    ctx.fillStyle = GREY; ctx.font = "11px Arial";
+    for (let i = 0; i < 12; i += 2) { const p = proj([i / 11, 0, 1.06]); ctx.fillText(MON[i], p[0] - 8, p[1]); }
+    for (let j = 0; j < 7; j++) { const p = proj([-0.05, 0, j / 6]); ctx.fillText("+" + (j + 1) + "d", p[0] - 22, p[1] + 3); }
+    ctx.fillText("mean forecast " + money(vmin) + " → " + money(vmax), 10, 16);
+  }, { az: -0.95, el: 0.72, zoom: 0.95 });
+
+  /* ---------- data charts in 3D ---------- */
+  let mode3d = "price";
+  const c3 = orbit3d($("cv-3d"), $("tip-3d"), (ctx, proj, W, H, addHover) => {
+    grid3(ctx, proj);
+    if (mode3d === "price") {
+      const ser = E.series.slice(-365);
+      const vs = ser.map(p => p.v), vmin = Math.min(...vs), vmax = Math.max(...vs);
+      const ny = v => (v - vmin) / ((vmax - vmin) || 1) * 0.8;
+      const P3 = ser.map((p, i) => proj([i / (ser.length - 1), ny(p.v), 0.5]));
+      for (let i = 0; i < ser.length - 1; i++) {
+        const a = P3[i], b = P3[i + 1], a0 = proj([i / (ser.length - 1), 0, 0.5]), b0 = proj([(i + 1) / (ser.length - 1), 0, 0.5]);
+        quad(ctx, [a, b, b0, a0], "rgba(88,150,230,.16)", null);
+      }
+      ctx.strokeStyle = BLUE; ctx.lineWidth = 1.8; ctx.beginPath();
+      P3.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      for (let i = 0; i < ser.length; i += 7)
+        addHover(P3[i][0], P3[i][1], ser[i].d + " · " + money(ser[i].v) + "/MWh");
+      addHover(P3[P3.length - 1][0], P3[P3.length - 1][1], ser[ser.length - 1].d + " · " + money(ser[ser.length - 1].v) + "/MWh");
+      ctx.fillStyle = GREY; ctx.font = "11px Arial";
+      const a = proj([0, 0.84, 0.5]); ctx.fillText(money(vmax), a[0] - 6, a[1]);
+      const b = proj([0, 0, 0.5]); ctx.fillText(money(vmin), b[0] - 6, b[1] + 10);
+      const c = proj([0, -0.06, 0.5]); ctx.fillText(ser[0].d, c[0] - 24, c[1] + 8);
+      const d = proj([1, -0.06, 0.5]); ctx.fillText(ser[ser.length - 1].d, d[0] - 62, d[1] + 8);
+    } else {
+      const h = $("fi-h").value, coefs = E.featimp_ridge[h], feats = E.features;
+      const rows = feats.map((f, i) => [f, coefs[i]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+      const mx = Math.max(...rows.map(r => Math.abs(r[1]))) || 1, n = rows.length;
+      const bars = rows.map((r, i) => {
+        const xc = (i + 0.5) / n, hw = 0.42 / n, y = Math.abs(r[1]) / mx * 0.8;
+        const f1 = proj([xc - hw, y, 0.60]), f2 = proj([xc + hw, y, 0.60]),
+          f3 = proj([xc + hw, 0, 0.60]), f4 = proj([xc - hw, 0, 0.60]);
+        const t1 = proj([xc - hw, y, 0.40]), t2 = proj([xc + hw, y, 0.40]);
+        const s3 = proj([xc + hw, 0, 0.40]);
+        return { r, faces: [[f1, f2, f3, f4], [t1, t2, f2, f1], [f2, t2, s3, f3]],
+                 d: (f1[2] + f3[2]) / 2, cx: (f1[0] + f3[0]) / 2, cy: (f1[1] + f3[1]) / 2 };
+      });
+      bars.sort((a, b) => b.d - a.d);
+      bars.forEach(b => {
+        const base = b.r[1] >= 0 ? "67,209,124" : "255,122,107";
+        quad(ctx, b.faces[2], `rgba(${base},.55)`, null);
+        quad(ctx, b.faces[0], `rgba(${base},.96)`, "rgba(10,18,28,.4)");
+        quad(ctx, b.faces[1], `rgba(${base},1)`, "rgba(10,18,28,.4)");
+        addHover(b.cx, b.cy, b.r[0] + " · coef " + fmt(b.r[1], 3) + " (+" + h + "d ridge)");
+      });
+      ctx.fillStyle = GREY; ctx.font = "11px Arial";
+      const a = proj([0, 0.86, 0.5]);
+      ctx.fillText("standardized ridge coefficients, +" + h + "d · tallest |coef| " + fmt(mx, 3), a[0] - 6, a[1]);
+    }
+  });
+  document.querySelectorAll(".hte3-mode").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".hte3-mode").forEach(x => x.classList.toggle("hte3-on", x === b));
+    mode3d = b.dataset.mode; c3.render();
+  }));
+
+  /* ---------- market regimes (day clusters) ---------- */
+  const PALETTE = ["#8FC1F2", "#43D17C", "#FFD24D", "#FF7A6B", "#C792EA", "#4DD0E1"];
+  function drawRegimes() {
+    const RG = E.regimes;
+    const sorted = [...RG.regimes].sort((a, b) => a.mean_price - b.mean_price);
+    const colorOf = {}; sorted.forEach((g, i) => colorOf[g.id] = PALETTE[i % PALETTE.length]);
+    $("rgm-tbl").innerHTML =
+      "<tr><th>Regime</th><th>Days</th><th>Share</th><th>Mean price $</th><th>Median $</th><th>Std $</th><th>Mean gas $</th><th>Mean 7d temp °C</th><th>Mean flow anomaly</th></tr>" +
+      sorted.map(g => `<tr><td><span style="color:${colorOf[g.id]}">■</span> ${g.label}</td><td>${g.n}</td><td>${fmt(g.share_pct, 1)}%</td><td>${fmt(g.mean_price)}</td><td>${fmt(g.median_price)}</td><td>${fmt(g.std_price)}</td><td>${fmt(g.mean_gas)}</td><td>${fmt(g.mean_temp7, 1)}</td><td>${fmt(g.mean_flow_anom, 3)}</td></tr>`).join("");
+    $("rgm-legend").innerHTML = sorted.map(g =>
+      `<span><span class="sw" style="background:${colorOf[g.id]}"></span>${g.label} (${g.n} days)</span>`).join("") +
+      `<span>PC1 ${fmt(RG.pca.explained_pct[0], 1)}% · PC2 ${fmt(RG.pca.explained_pct[1], 1)}% of variance</span>`;
+    // PCA scatter
+    {
+      const cv = $("cv-rgm-pca"); const [ctx, W, H] = setup(cv, 300);
+      const pad = { l: 46, r: 10, t: 10, b: 24 };
+      const xs = RG.pca.points.map(p => p.x), ys = RG.pca.points.map(p => p.y);
+      const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.min(...ys), ymax = Math.max(...ys);
+      axes(ctx, W, H, pad, ymin, ymax, "");
+      RG.pca.points.forEach(p => {
+        const x = pad.l + (W - pad.l - pad.r) * (p.x - xmin) / ((xmax - xmin) || 1);
+        const y = (H - pad.b) - (H - pad.t - pad.b) * (p.y - ymin) / ((ymax - ymin) || 1);
+        ctx.fillStyle = colorOf[p.c]; ctx.fillRect(x - 1.6, y - 1.6, 3.2, 3.2);
+      });
+      ctx.fillStyle = GREY; ctx.font = "11px Arial";
+      ctx.fillText("PC1 (" + fmt(RG.pca.explained_pct[0], 1) + "%)", W - pad.r - 70, H - 8);
+      ctx.fillText("PC2 (" + fmt(RG.pca.explained_pct[1], 1) + "%)", pad.l + 2, pad.t + 4);
+    }
+    // timeline
+    {
+      const cv = $("cv-rgm-tl"); const [ctx, W, H] = setup(cv, 170);
+      const pad = { l: 118, r: 10, t: 8, b: 20 };
+      const T = RG.timeline, n = T.dates.length;
+      const rowOf = {}; sorted.forEach((g, i) => rowOf[g.id] = i);
+      const rh = (H - pad.t - pad.b) / sorted.length;
+      ctx.font = "11px Arial";
+      sorted.forEach((g, i) => {
+        const y = pad.t + rh * i + rh / 2;
+        ctx.fillStyle = colorOf[g.id]; ctx.fillText("■", 2, y + 3);
+        ctx.fillStyle = "#E6EDF5";
+        const lab = g.label.length > 22 ? g.label.slice(0, 21) + "…" : g.label;
+        ctx.fillText(lab, 14, y + 3);
+      });
+      T.labels.forEach((c, i) => {
+        const x = pad.l + (W - pad.l - pad.r) * i / (n - 1);
+        const y = pad.t + rh * rowOf[c] + rh / 2;
+        ctx.fillStyle = colorOf[c]; ctx.fillRect(x, y - 2.4, 2.2, 4.8);
+      });
+      ctx.fillStyle = GREY;
+      ctx.fillText(T.dates[0], pad.l, H - 5);
+      ctx.fillText(T.dates[n - 1], W - pad.r - 62, H - 5);
+    }
+    $("rgm-note").textContent =
+      "k = " + RG.k + " chosen by silhouette score over " + RG.timeline.dates.length + " forecast origin days and " +
+      RG.features.length + " standardized features (" + RG.features.join(", ") + "). Silhouette by k: " +
+      Object.entries(RG.silhouette).map(([k, v]) => "k=" + k + ": " + fmt(v, 3)).join(" · ") +
+      ". Clusters describe kinds of days in this region's own record; they are not a station grouping.";
+  }
+
+  /* ---------- MLOps / retraining status ---------- */
+  function drawMlops() {
+    const BM = X.build_meta, MR = BM.regions[rid];
+    const chosenSummary = obj => {
+      const c = {};
+      Object.values(obj || {}).forEach(v => { if (v) c[v] = (c[v] || 0) + 1; });
+      return Object.entries(c).map(([k, v]) => k + " ×" + v).join(", ") || "—";
+    };
+    const rows = [
+      ["Last retrain (build run)", BM.generated_at + " UTC"],
+      ["Retrain sanity vs shipped daily metrics", MR.sanity],
+      ["Data span", MR.data_first + " → " + MR.data_last + " · " + MR.n_days + " priced days"],
+      ["Daily origins", MR.train_origins + " train · " + MR.holdout_origins + " holdout (from " + MR.holdout_start + ")"],
+      ["Daily models selected", chosenSummary(MR.daily_chosen)],
+      ["Weekly models selected", chosenSummary(MR.weekly_chosen) + " · holdout from " + MR.weekly_holdout_start],
+      ["Monthly models selected", chosenSummary(MR.monthly_chosen) + " · holdout from " + MR.monthly_holdout_start],
+      ["Yearly outlook basis", "monthly climatology over " + MR.yearly_years.join(", ")],
+      ["Market regimes", "k = " + MR.regimes_k + " day clusters"],
+      ["Drift status", MR.drift_status + " — largest shift: " + MR.drift_max_feature + " at " + fmt(MR.drift_max_shift) + " train std"],
+    ];
+    $("mlops-tbl").innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  }
+  $("fi-h").onchange = () => { drawFeatimp(); if (mode3d === "feat") c3.render(); };
+
+  function drawAll() { drawHistory(); drawMoving(); drawOutlook(); drawLead(); drawFeatimp(); drawCorr(); drawOutlooks(); drawYearly(); drawRegimes(); drawMlops(); surfCtl.render(); c3.render(); }
   window.addEventListener("resize", drawAll);
   drawAll();
 })();

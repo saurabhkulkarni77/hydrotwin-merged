@@ -33,7 +33,47 @@ EXTRA_CSS = """
 .hts-spark h4{margin:0 0 6px;font-size:12.5px;color:#8FC1F2;text-transform:uppercase;letter-spacing:.04em}
 .hts-spark canvas{width:100%;height:auto;display:block}
 a.hts-navbtn.on{background:#23466E}
+.hte3-ctl{display:flex;gap:8px;margin:4px 0 10px;flex-wrap:wrap}
+.hte3-mode{background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:8px;padding:7px 12px;font:600 13px Arial;cursor:pointer}
+.hte3-mode.hte3-on{background:#2E9B57;border-color:#7AE07A}
+.hte3-view{position:relative}
+.hte3-canvas{display:block;width:100%;height:440px;border-radius:10px;background:#0E1A24;cursor:grab;touch-action:none}
+.hte3-tip{position:absolute;display:none;background:rgba(11,19,29,.94);color:#E6EDF5;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:5px 9px;font:12.5px Arial;pointer-events:none;max-width:300px}
+.hte3-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px;font-size:11.5px;color:#9FB3C8}
+.hte3-legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 """
+
+# Real hub geography for the 3D scene pages. elev/geoid are approximate site
+# values used ONLY to seat the tile scene at local ground level (the same
+# role REFE + GEOID18 play on the river 3D pages); they are not data.
+HUB_GEO = {
+    "palo": dict(lat=33.3886, lon=-112.8617, elev=290, geoid=-33.4,
+                 place="Palo Verde Nuclear Generating Station, Wintersburg, Arizona",
+                 note="The Palo Verde hub is named for this switchyard: the largest "
+                      "generating station in the US, whose output anchors Southwest "
+                      "day-ahead prices."),
+    "np15": dict(lat=38.5816, lon=-121.4944, elev=10, geoid=-31.8,
+                 place="Sacramento, California",
+                 note="NP15 is a virtual trading hub — an average of generator nodes "
+                      "across Northern California, with no single physical site. The "
+                      "scene is placed at Sacramento, the region's load centre, beside "
+                      "the Sacramento River gauges this twin's features draw on."),
+    "midc": dict(lat=45.5946, lon=-121.1787, elev=35, geoid=-22.8,
+                 place="The Dalles, Oregon — Columbia River",
+                 note="The Mid-Columbia hub trades around the Columbia River dams; "
+                      "this scene sits at The Dalles, the same reach as river station "
+                      "USGS 14105700 (Columbia River at The Dalles) in this twin."),
+}
+
+
+def _ion_token():
+    """The Cesium Ion client token the river 3D pages themselves ship with
+    (asset 2275207, Google Photorealistic 3D Tiles) — copied from the river
+    source so the energy scene pages use the project's own public token."""
+    page = (RIVER / "stations" / "USGS-01463500-3d.html").read_text()
+    m = re.search(r"HT_T3_TOKEN\s*=\s*'([^']+)'", page)
+    assert m, "Ion token not found in river 3D page"
+    return m.group(1)
 
 REGIONS = [("palo", "Palo Verde"), ("np15", "CAISO NP15"), ("midc", "Mid-Columbia")]
 
@@ -59,6 +99,7 @@ def region_page(rid):
       <a class="hts-navbtn" href="../index.html">← River map</a>
       <a class="hts-navbtn" href="index.html">Energy regions</a>
       {others}
+      <a class="hts-navbtn" href="{rid}-3d.html">3D scene</a>
       <a class="hts-navbtn" href="../mlops.html">MLOps</a>
     </nav>
   </header>
@@ -112,6 +153,31 @@ def region_page(rid):
     <p class="hts-note">Ridge model refit on the training origins with one feature group removed at a time, scored on the same holdout. A positive Δ means the group was helping. Computed for this merged build by the energy pipeline's own feature code.</p>
   </section>
 
+  <section class="hts-sec" id="sec-weekly">
+    <h2>Weekly outlook</h2>
+    <canvas id="cv-weekly" class="hts-cv" width="1320" height="250"></canvas>
+    <table class="hts-tbl" id="wk-tbl" style="margin-top:10px"></table>
+    <h3>Issued outlook — next 12 weeks</h3>
+    <table class="hts-tbl" id="wk-fc"></table>
+    <p class="hts-note">Weekly mean price models trained for this merged build on the region's real daily series, aggregated to weeks (weeks ending Sunday, at least 3 priced days each). Per horizon, a ridge on lagged weekly means, gas, flow and calendar features competes with a week of year climatology on a validation slice; the winner is refit on the training weeks and scored once on the holdout (<span id="wk-ho"></span>). The issued outlook refits the winner on all weeks. Same protocol as the daily models, one scale up — the river twin's weekly outlook slot, with energy models genuinely trained at the weekly scale.</p>
+  </section>
+
+  <section class="hts-sec" id="sec-monthly">
+    <h2>Monthly outlook</h2>
+    <canvas id="cv-monthly" class="hts-cv" width="1320" height="250"></canvas>
+    <table class="hts-tbl" id="mo-tbl" style="margin-top:10px"></table>
+    <h3>Issued outlook — next 6 months</h3>
+    <table class="hts-tbl" id="mo-fc"></table>
+    <p class="hts-note">Monthly mean price models (months with at least 15 priced days), trained the same way as the weekly models: ridge on lagged monthly means, gas and calendar features against a calendar month climatology, winner by validation, scored once on the holdout (<span id="mo-ho"></span>). Read the n column before trusting a line: with only a few years of history the monthly holdout holds a handful of origins, so these scores are indicative, not precise.</p>
+  </section>
+
+  <section class="hts-sec" id="sec-yearly">
+    <h2>Yearly outlook</h2>
+    <canvas id="cv-yearly" class="hts-cv" width="1320" height="250"></canvas>
+    <table class="hts-tbl" id="yr-tbl" style="margin-top:10px"></table>
+    <p class="hts-note" id="yr-note"></p>
+  </section>
+
   <section class="hts-sec" id="sec-drift">
     <h2>Drift</h2>
     <table class="hts-tbl" id="dr-tbl"></table>
@@ -122,6 +188,15 @@ def region_page(rid):
     <h2>Confidence band</h2>
     <table class="hts-tbl" id="band-tbl"></table>
     <p class="hts-note">The energy twin's interval method: a constant ±1.2816 × per horizon holdout residual σ around each forecast (about 80 percent if residuals were normal). This is the energy equivalent of the river pages' DACP confidence panels — the river twin fits distribution adjusted intervals per station, while the energy models ship residual σ bands, so the band shown here is the energy project's own published method rather than a refit of the river one.</p>
+  </section>
+
+  <section class="hts-sec" id="sec-surface">
+    <h2>Forecast surface in 3D</h2>
+    <div class="hte3-view">
+      <canvas id="cv-surface" class="hte3-canvas" aria-label="Interactive 3D surface: mean holdout forecast price by origin month and forecast horizon. Drag to orbit, scroll to zoom, hover for exact values"></canvas>
+      <div class="hte3-tip" id="tip-surface"></div>
+    </div>
+    <p class="hts-note">Mean holdout forecast price by origin calendar month (x) and forecast horizon +1 to +7 days (z), computed from this region's genuine walk-forward backtest — every cell averages the actual forecasts the models issued from origins in that month. Months with no holdout origins stay empty: the holdout covers only part of the year (see the moving forecast panel), so this surface describes the holdout months, not a full year of seasons. Drag to orbit, scroll to zoom, hover a cell for its values. This is the energy counterpart of the river pages' 3D forecast chart.</p>
   </section>
 
   <section class="hts-sec" id="sec-corr">
@@ -137,6 +212,31 @@ def region_page(rid):
     <p class="hts-note">Standardized ridge coefficients for the selected horizon (features are standardized before fitting, so coefficient size is comparable). Green pushes the price change up, red pushes it down. Shown for the ridge model, whose coefficients are directly readable; the MLP horizons are compared in the model compare table instead.</p>
   </section>
 
+  <section class="hts-sec" id="sec-charts3d">
+    <h2>Data charts in 3D</h2>
+    <p class="hts-note">The two charts above, rendered in 3D from exactly the same data: the price history is the last 365 days of this region's price record, and the bars are the ridge feature importances from the same data as the 2D chart (horizon follows the selector in the features panel). Drag to orbit, scroll to zoom, hover a point or a bar to read its exact values. The photorealistic terrain scene for this hub is on the region's <a href="{rid}-3d.html" style="color:#8FC1F2">3D scene page</a>.</p>
+    <div class="hte3-ctl">
+      <button type="button" class="hte3-mode hte3-on" data-mode="price">Price history 3D</button>
+      <button type="button" class="hte3-mode" data-mode="feat">Feature importance 3D</button>
+    </div>
+    <div class="hte3-view">
+      <canvas id="cv-3d" class="hte3-canvas" aria-label="Interactive 3D chart: drag to orbit, scroll to zoom, hover for exact values"></canvas>
+      <div class="hte3-tip" id="tip-3d"></div>
+    </div>
+  </section>
+
+  <section class="hts-sec" id="sec-regimes">
+    <h2>Market regimes — day clusters</h2>
+    <p class="hts-note">The river twin clusters its 14 stations by how their rivers behave; three regions cannot be clustered meaningfully, so this panel clusters DAYS instead. Every forecast origin day is a point in this region's standardized daily feature space (the 19 model features plus 7 day price volatility), grouped by k means with k chosen by silhouette score. Days in one regime share a market character. The table gives each regime's size and price statistics; regime names are assigned by rule from those statistics, not by hand. The scatter shows the days in the first two principal components of the same features, and the timeline shows when each regime occurred.</p>
+    <table class="hts-tbl" id="rgm-tbl"></table>
+    <h3>Days in feature space (PCA)</h3>
+    <canvas id="cv-rgm-pca" class="hts-cv" width="1320" height="300"></canvas>
+    <div class="hte3-legend" id="rgm-legend"></div>
+    <h3>Regime timeline</h3>
+    <canvas id="cv-rgm-tl" class="hts-cv" width="1320" height="170"></canvas>
+    <p class="hts-note" id="rgm-note"></p>
+  </section>
+
   <section class="hts-sec" id="sec-cond">
     <h2>Conditions — flow, snow, soil, gas</h2>
     <div class="hts-sparks">
@@ -149,14 +249,20 @@ def region_page(rid):
     <table class="hts-tbl" id="fl-tbl"></table>
   </section>
 
+  <section class="hts-sec" id="sec-mlops">
+    <h2>MLOps — retraining status</h2>
+    <table class="hts-tbl" id="mlops-tbl"></table>
+    <p class="hts-note">The energy models are retrained every time this merged site is built: the build re-runs the energy pipeline's own training code on its cached raw data and regenerates every forecast, backtest and diagnostic on these pages, at the daily, weekly and monthly scales. Every value above is read from that run's own outputs — the retrain timestamp is when this build's training run executed, and the sanity line records whether the retrained daily models reproduced the shipped HydroTwin Energy holdout metrics. This mirrors the river twin's MLOps status presentation (see the <a href="../mlops.html" style="color:#8FC1F2">river MLOps page</a>); the energy side has no separate live feed because its retraining happens inside the build itself.</p>
+  </section>
+
   <section class="hts-sec" id="sec-notebook">
     <h2>Region notebook</h2>
     <h3>Stations and feeds behind this region</h3>
     <ul class="hts-note" id="nb-stations" style="margin:0;padding-left:18px"></ul>
     <h3>Known limitations</h3>
     <ul class="hts-note" id="nb-limits" style="margin:0;padding-left:18px"></ul>
-    <h3>Panels on the river pages with no energy equivalent</h3>
-    <p class="hts-note">Weekly, monthly and yearly outlooks: the energy models are daily models with horizons of +1 to +7 days only — no weekly, monthly or yearly energy models were ever trained, so those outlook panels have nothing genuine to show here. The 3D scene and 3D data charts: a wholesale price hub has no river reach or terrain scene in either project, and no 3D data was built for the regions. Station clusters: the river twin clusters 14 stations by traits; three regions do not support a meaningful clustering. Live retraining badges (load new model, tuning status): the energy twin is a static snapshot by design, with no retraining feed.</p>
+    <h3>What still differs from the river pages</h3>
+    <p class="hts-note">Yearly outlook: the river twin fits yearly models on 25 years of flow; this region has only a few years of price history (the yearly panel states the exact span), so the yearly outlook here is a monthly climatology with its year to year spread, checked by leave-one-year-out validation instead of holdout scores — no fitted yearly model is claimed. 3D scene: the region's 3D page uses the same Google Photorealistic 3D Tiles scene as the river 3D pages, placed at the hub's real geography, but a price hub has no gauge reach, water surface or rating curve, so the scene carries the hub marker and the price panels rather than flow ribbons and flood layers. Clusters: the river panel clusters stations; the energy panel clusters days into market regimes (above), which is the genuine equivalent for three regions.</p>
   </section>
 
   <p class="hts-note" style="margin-top:14px">Merged twin: river pages and energy pages share one index. River data: USGS daily flow and weather, Oct 2001 to Sep 2026. Energy data: ICE day-ahead indices republished by EIA, CAISO OASIS, EIA Henry Hub, USGS, NRCS SNOTEL and SCAN, Open-Meteo.</p>
@@ -180,7 +286,7 @@ HUB = f"""<!doctype html>
     <div class="hts-title">
       <h1>Energy price regions</h1>
       <div class="hts-sub">HydroTwin Energy — wholesale electricity price forecasting, merged into the river twin</div>
-      <div class="hts-sub2">Three hubs, each with the same panel set as a river station page: price history, a moving walk-forward forecast, a 7 day outlook, model statistics and compare, feature ablation, drift, correlation, feature importance, conditions and a region notebook.</div>
+      <div class="hts-sub2">Three hubs, each with the same panel set as a river station page: price history, a moving walk-forward forecast, 7 day, weekly, monthly and yearly outlooks, model statistics and compare, feature ablation, drift, a 3D forecast surface, correlation, feature importance, 3D data charts, market regime day clusters, conditions, MLOps retraining status and a region notebook — plus a photorealistic 3D scene page at each hub's real geography.</div>
       <span class="hts-span" id="hub-note"></span>
     </div>
     <nav class="hts-nav">
@@ -198,15 +304,225 @@ HUB = f"""<!doctype html>
   </section>
 
   <section class="hts-sec">
+    <h2>Energy MLOps — last build retrain</h2>
+    <table class="hts-tbl" id="hub-mlops"></table>
+    <p class="hts-note">Every merged build retrains the energy models from the pipeline's cached raw data — daily, weekly and monthly scales — and regenerates all forecasts and diagnostics. The timestamp and per region status above come from the latest build run's own outputs, mirroring the river twin's MLOps status page.</p>
+  </section>
+
+  <section class="hts-sec">
     <h2>How the merge works</h2>
-    <p class="hts-note">This merged twin keeps the river twin exactly as it was — all 14 stations, their 3D scenes and every panel — and adds the energy twin's three regions as first class pages next to them, reachable from the same station list on the map page. Energy forecasts come from the HydroTwin Energy models: per horizon ridge or MLP on the signed log price change, selected on a validation slice and scored once on a time based holdout against persistence, using 19 daily features built from USGS flow, NRCS soil and snow, Open-Meteo weather and Henry Hub gas — the same public feeds the river twin uses.</p>
-    <p class="hts-note">Panels with no genuine energy equivalent are not faked: weekly, monthly and yearly outlooks (energy models are +1 to +7 days only), the 3D terrain scene and 3D data charts (a price hub has no river reach), station clustering (three regions cannot be clustered meaningfully), and live retraining badges (the energy twin is a static snapshot by design). Each region page states this in its notebook section.</p>
+    <p class="hts-note">This merged twin keeps the river twin exactly as it was — all 14 stations, their 3D scenes and every panel — and adds the energy twin's three regions as first class pages next to them, reachable from the same station list on the map page. Energy forecasts come from the HydroTwin Energy models: per horizon ridge or MLP on the signed log price change, selected on a validation slice and scored once on a time based holdout against persistence, using 19 daily features built from USGS flow, NRCS soil and snow, Open-Meteo weather and Henry Hub gas — the same public feeds the river twin uses. Weekly and monthly outlooks are trained the same way at their own scales; the yearly outlook is a monthly climatology, because a few years of prices cannot support a fitted yearly model.</p>
+    <p class="hts-note">Three honest differences from the river pages remain, and each region page states them in its notebook: the yearly outlook is a climatology rather than a fitted model; the 3D scene pages show the hub's real geography with price panels but no flow ribbons or flood layers (a price hub has no gauge reach); and the clusters panel clusters days into market regimes rather than stations, which three regions cannot support.</p>
   </section>
 </div>
 <script src="data.js"></script>
+<script src="energy_extra.js"></script>
 <script src="energy_hub.js"></script>
 </body></html>
 """
+
+
+SCENE_PAGE = r"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HydroTwin 3D · __NAME__</title>
+<style>
+ html,body{margin:0;height:100%;background:#0B1622;color:#E6EDF5;font-family:Arial,sans-serif;overflow:hidden}
+ #scene{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+ .card{position:fixed;z-index:10;background:rgba(10,20,34,.9);border:1px solid #22344C;border-radius:12px;padding:12px 14px;max-width:360px}
+ #info{left:14px;top:14px}
+ #info h1{font-size:17px;margin:0 0 2px}
+ #info .place{color:#8FC1F2;font-size:12.5px;margin-bottom:6px}
+ #info p{font-size:12.5px;line-height:1.5;color:#C7D5E6;margin:6px 0}
+ #info a{color:#8FC1F2}
+ .row{display:flex;justify-content:space-between;gap:14px;font-size:12.5px;margin:3px 0}
+ .row b{color:#FFD24D;font-weight:600}
+ #tstat{left:14px;bottom:14px;font-size:12px;color:#9FB3C8}
+ #credits{position:fixed;right:10px;bottom:8px;z-index:10;font-size:11px;color:#9FB3C8;background:rgba(7,25,32,.85);padding:4px 9px;border-radius:6px;max-width:60vw}
+ .nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+ .nav a{background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:8px;padding:6px 10px;font-size:12.5px;text-decoration:none}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"},"scopes":{"../vendor3d/":{"three":"../vendor3d/three.module.min.js"}}}</script>
+</head>
+<body>
+<canvas id="scene" aria-label="Photorealistic 3D scene at the hub. Drag to orbit, scroll to zoom."></canvas>
+<div class="card" id="info">
+  <h1 id="rg-name">__NAME__</h1>
+  <div class="place">__PLACE__ · __LAT__, __LON__</div>
+  <p>__NOTE__</p>
+  <p>The gold pin marks the hub location in the same Google Photorealistic 3D Tiles
+  scene the river 3D pages use. A price hub has no gauge reach, water surface or
+  rating curve, so this scene carries the hub marker and the live price summary —
+  the forecasts, ribbons and flood layers stay on the river pages, and every
+  energy panel is on the region page.</p>
+  <div id="live"></div>
+  <div class="nav">
+    <a href="__RID__.html">← Region page</a>
+    <a href="index.html">Energy regions</a>
+    <a href="../index.html">River map</a>
+  </div>
+</div>
+<div class="card" id="tstat">Loading 3D tiles…</div>
+<div id="credits">Basemap: Google Maps · 3D tiles access: Cesium ion · Prices: HydroTwin Energy</div>
+<script src="data.js"></script>
+<script>
+  (function () {
+    var R = window.HTE_DATA.regions.find(function (r) { return r.id === "__RID__"; });
+    var f = R.forecast.slice(0, 3).map(function (x) {
+      return '<div class="row"><span>' + x.date + '</span><b>$' + x.pred.toFixed(2) + '/MWh</b></div>';
+    }).join("");
+    document.getElementById("live").innerHTML =
+      '<div class="row"><span>Latest price (' + R.latest.last_price_date + ')</span><b>$' +
+      R.latest.last_price.toFixed(2) + '/MWh</b></div>' + f +
+      '<div class="row"><span>Forecast issued</span><b>' + R.forecast_origin + '</b></div>';
+  })();
+</script>
+<script type="module">
+  const stat = document.getElementById("tstat");
+  const LAT = __LATV__, LON = __LONV__, ELEV = __ELEVV__, GEOID = __GEOIDV__;
+  window.addEventListener("error", function (e) {
+    stat.textContent = "3D scene error: " + (e.message || "failed to load") +
+      " — the region page panels are unaffected.";
+  });
+  try {
+    const T3 = await import("../vendor3d/three.module.min.js");
+    const dep = await import("../vendor3d/dependencies.js");
+    if (typeof T3.Material.prototype.onBuild !== "function")
+      T3.Material.prototype.onBuild = function () {};
+    const canvas = document.getElementById("scene");
+    const renderer = new T3.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new T3.Scene();
+    scene.background = new T3.Color(0x0b1622);
+    const camera = new T3.PerspectiveCamera(55, 1, 1, 30000);
+    // local East/Up/South frame at the hub, same construction as the river
+    // 3D pages (ht-tiles3d v1): tiles are placed by an ECEF->local matrix,
+    // with the up translation lowered by the site elevation + geoid height
+    // so the ground sits at local y = 0.
+    function ecef(lat, lon, h) {
+      const p = lat * Math.PI / 180, l = lon * Math.PI / 180, a = 6378137,
+        e2 = 6.69437999014e-3, n = a / Math.sqrt(1 - e2 * Math.sin(p) ** 2);
+      return [(n + h) * Math.cos(p) * Math.cos(l), (n + h) * Math.cos(p) * Math.sin(l),
+              (n * (1 - e2) + h) * Math.sin(p)];
+    }
+    function localFrame(lat, lon) {
+      const p = lat * Math.PI / 180, l = lon * Math.PI / 180, o = ecef(lat, lon, 0);
+      const east = [-Math.sin(l), Math.cos(l), 0],
+        up = [Math.cos(p) * Math.cos(l), Math.cos(p) * Math.sin(l), Math.sin(p)],
+        south = [Math.sin(p) * Math.cos(l), Math.sin(p) * Math.sin(l), -Math.cos(p)];
+      const dot = (a, b) => a.reduce((v, x, i) => v + x * b[i], 0);
+      const m = [...east, -dot(east, o), ...up, -dot(up, o), ...south, -dot(south, o), 0, 0, 0, 1];
+      m[7] -= (ELEV + GEOID);
+      return m;
+    }
+    const tiles = new dep.TilesRenderer(undefined);
+    const draco = new dep.DRACOLoader().setDecoderPath("../vendor3d/draco/");
+    tiles.registerPlugin(new dep.CesiumIonAuthPlugin({
+      apiToken: "__TOKEN__", assetId: 2275207, autoRefreshToken: true,
+      useRecommendedSettings: false }));
+    tiles.registerPlugin(new dep.GLTFExtensionsPlugin({ dracoLoader: draco }));
+    tiles.registerPlugin(new dep.TileCompressionPlugin({
+      disableMipmaps: true, compressIndex: true, compressPosition: false,
+      compressUvs: false, compressNormals: false }));
+    tiles.errorTarget = 16;
+    tiles.lruCache.minSize = 450; tiles.lruCache.maxSize = 1600;
+    tiles.lruCache.minBytesSize = 256 * 1024 * 1024;
+    tiles.lruCache.maxBytesSize = 512 * 1024 * 1024;
+    tiles.group.matrixAutoUpdate = false;
+    tiles.group.matrix.set(...localFrame(LAT, LON));
+    tiles.group.updateWorldMatrix(true, false);
+    scene.add(tiles.group);
+    // hub marker (basic materials: the tile scene is unlit)
+    const gold = new T3.MeshBasicMaterial({ color: 0xffd24d });
+    const pole = new T3.Mesh(new T3.CylinderGeometry(2.5, 2.5, 150, 10), gold);
+    pole.position.set(0, 75, 0); scene.add(pole);
+    const ball = new T3.Mesh(new T3.SphereGeometry(13, 20, 14), gold);
+    ball.position.set(0, 158, 0); scene.add(ball);
+    const ring = new T3.Mesh(new T3.RingGeometry(38, 46, 48),
+      new T3.MeshBasicMaterial({ color: 0xffd24d, side: T3.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(0, 2, 0); scene.add(ring);
+    // simple orbit controls (drag / wheel / touch), target at the hub
+    let az = 0.7, el = 0.9, dist = 2100;
+    const target = new T3.Vector3(0, 0, 0);
+    function placeCam() {
+      camera.position.set(
+        target.x + dist * Math.cos(el) * Math.sin(az),
+        target.y + dist * Math.sin(el),
+        target.z + dist * Math.cos(el) * Math.cos(az));
+      camera.lookAt(target);
+    }
+    let drag = null;
+    canvas.addEventListener("pointerdown", e => {
+      drag = [e.clientX, e.clientY]; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", e => {
+      if (!drag) return;
+      az -= (e.clientX - drag[0]) * 0.005;
+      el = Math.min(1.45, Math.max(0.12, el + (e.clientY - drag[1]) * 0.005));
+      drag = [e.clientX, e.clientY]; placeCam(); });
+    canvas.addEventListener("pointerup", () => { drag = null; });
+    canvas.addEventListener("wheel", e => {
+      e.preventDefault();
+      dist = Math.min(7000, Math.max(120, dist * (e.deltaY > 0 ? 1.12 : 0.89)));
+      placeCam(); }, { passive: false });
+    let models = 0, errors = 0;
+    setTimeout(() => {
+      if (!models) stat.textContent = "3D tiles have not arrived yet — they stream live from " +
+        "Cesium ion / Google Photorealistic 3D Tiles; if this persists, check the connection " +
+        "and keep the page open. The region page panels are unaffected.";
+    }, 25000);
+    tiles.addEventListener("load-model", () => {
+      models++;
+      stat.textContent = "3D tiles streaming · " + models + " tile models loaded" +
+        (errors ? " · " + errors + " errors" : "") + " · drag to orbit, scroll to zoom";
+    });
+    tiles.addEventListener("load-error", () => { errors++; });
+    const resV = new T3.Vector2(1, 1);
+    function resize() {
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+    resize(); placeCam();
+    window.__htEnergyTiles = { models: () => models, errors: () => errors };
+    (function tick() {
+      requestAnimationFrame(tick);
+      try {
+        tiles.setCamera(camera);
+        renderer.getDrawingBufferSize(resV);
+        tiles.setResolution(camera, resV);
+        tiles.update();
+        renderer.render(scene, camera);
+      } catch (err) {
+        stat.textContent = "3D tiles failed: " + String(err && err.message || err).slice(0, 200);
+      }
+    })();
+  } catch (err) {
+    stat.textContent = "3D tiles failed to load: " +
+      String(err && err.message || err).slice(0, 200) +
+      " — the region page panels are unaffected.";
+  }
+</script>
+</body></html>
+"""
+
+
+def scene_page(rid, token):
+    g = HUB_GEO[rid]
+    name = dict(REGIONS)[rid]
+    s = SCENE_PAGE
+    s = s.replace("__TOKEN__", token)
+    s = s.replace("__NAME__", name)
+    s = s.replace("__PLACE__", g["place"])
+    s = s.replace("__NOTE__", g["note"])
+    s = s.replace("__LAT__", f"{g['lat']:.4f}° N")
+    s = s.replace("__LON__", f"{abs(g['lon']):.4f}° W")
+    s = s.replace("__LATV__", repr(g["lat"]))
+    s = s.replace("__LONV__", repr(g["lon"]))
+    s = s.replace("__ELEVV__", repr(g["elev"]))
+    s = s.replace("__GEOIDV__", repr(g["geoid"]))
+    s = s.replace("__RID__", rid)
+    return s
 
 
 def main():
@@ -219,8 +535,10 @@ def main():
     shutil.copy(BUILD / "energy_extra.js", en / "energy_extra.js")
     shutil.copy(BUILD / "energy_region.js", en / "energy_region.js")
     shutil.copy(BUILD / "energy_hub.js", en / "energy_hub.js")
+    token = _ion_token()
     for rid, _ in REGIONS:
         (en / f"{rid}.html").write_text(region_page(rid))
+        (en / f"{rid}-3d.html").write_text(scene_page(rid, token))
     (en / "index.html").write_text(HUB)
 
     # --- patch the merged index only ---

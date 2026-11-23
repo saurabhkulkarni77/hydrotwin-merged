@@ -1,7 +1,8 @@
-/* HydroTwin Energy — hub page for the merged twin. All values from data.js. */
+/* HydroTwin Energy — hub page for the merged twin. All values from data.js
+   and energy_extra.js (build_meta from the latest build's retraining run). */
 (function () {
   "use strict";
-  const D = window.HTE_DATA;
+  const D = window.HTE_DATA, X = window.HTE_EXTRA;
   const $ = id => document.getElementById(id);
   const fmt = (n, d) => (n === null || n === undefined || isNaN(n)) ? "—" : Number(n).toFixed(d === undefined ? 2 : d);
   $("hub-cards").innerHTML = D.regions.map(r => {
@@ -19,4 +20,21 @@
     "<tr><th>Region</th><th>+1d MAE $</th><th>+1d RMSE $</th><th>+1d skill</th><th>+7d MAE $</th><th>+7d skill</th><th>Holdout origins</th><th>Holdout from</th></tr>" +
     D.regions.map(r => `<tr><td>${r.name}</td><td>${fmt(r.metrics[1].mae)}</td><td>${fmt(r.metrics[1].rmse)}</td><td>${fmt(r.metrics[1].skill_pct, 1)}%</td><td>${fmt(r.metrics[7].mae)}</td><td>${fmt(r.metrics[7].skill_pct, 1)}%</td><td>${r.holdout_origins}</td><td>${r.holdout_start}</td></tr>`).join("");
   $("hub-note").textContent = D.meta.note;
+
+  /* ---------- MLOps: last build retrain (from build_meta) ---------- */
+  const BM = X.build_meta;
+  const chosenSummary = obj => {
+    const c = {};
+    Object.values(obj || {}).forEach(v => { if (v) c[v] = (c[v] || 0) + 1; });
+    return Object.entries(c).map(([k, v]) => k + " ×" + v).join(", ") || "—";
+  };
+  $("hub-mlops").innerHTML =
+    "<tr><th>Region</th><th>Data span</th><th>Daily models</th><th>Weekly models</th><th>Monthly models</th><th>Drift status</th><th>Retrain sanity</th></tr>" +
+    D.regions.map(r => { const m = BM.regions[r.id]; return `<tr><td>${r.name}</td>` +
+      `<td>${m.data_first} → ${m.data_last} (${m.n_days} priced days)</td>` +
+      `<td>${chosenSummary(m.daily_chosen)}</td><td>${chosenSummary(m.weekly_chosen)}</td>` +
+      `<td>${chosenSummary(m.monthly_chosen)}</td>` +
+      `<td>${m.drift_status} (max ${m.drift_max_feature} ${fmt(m.drift_max_shift)}σ)</td>` +
+      `<td>${m.sanity} vs shipped metrics</td></tr>`; }).join("") +
+    `<tr><td colspan="7">Last retrain (this build): <b>${BM.generated_at}</b> UTC · ${BM.generator}</td></tr>`;
 })();
