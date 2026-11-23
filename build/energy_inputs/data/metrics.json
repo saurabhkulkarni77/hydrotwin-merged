@@ -1,0 +1,608 @@
+{
+ "palo": {
+  "cfg_name": "Palo Verde \u2014 Southwest (Colorado River)",
+  "hub": "Palo Verde hub (Arizona) \u2014 ICE day-ahead peak index (weighted avg $/MWh), republished by EIA",
+  "price_rows": 893,
+  "price_range": [
+   "2022-12-29",
+   "2026-11-11"
+  ],
+  "metrics": {
+   "1": {
+    "mae": 6.89,
+    "rmse": 9.14,
+    "r2": 0.832,
+    "n": 164,
+    "pers_mae": 7.24,
+    "pers_rmse": 9.99,
+    "skill_pct": 4.7,
+    "ridge_mae": 6.89,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 6.48,
+     "mlp": 9.48
+    },
+    "resid_sigma": 9.02
+   },
+   "2": {
+    "mae": 9.57,
+    "rmse": 12.48,
+    "r2": 0.687,
+    "n": 164,
+    "pers_mae": 9.78,
+    "pers_rmse": 13.38,
+    "skill_pct": 2.1,
+    "ridge_mae": 9.57,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 8.33,
+     "mlp": 15.18
+    },
+    "resid_sigma": 12.24
+   },
+   "3": {
+    "mae": 10.59,
+    "rmse": 13.71,
+    "r2": 0.62,
+    "n": 165,
+    "pers_mae": 10.67,
+    "pers_rmse": 14.6,
+    "skill_pct": 0.7,
+    "ridge_mae": 10.59,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 8.87,
+     "mlp": 12.83
+    },
+    "resid_sigma": 13.3
+   },
+   "4": {
+    "mae": 11.6,
+    "rmse": 14.79,
+    "r2": 0.556,
+    "n": 165,
+    "pers_mae": 11.61,
+    "pers_rmse": 15.71,
+    "skill_pct": 0.1,
+    "ridge_mae": 11.6,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 9.43,
+     "mlp": 12.94
+    },
+    "resid_sigma": 14.38
+   },
+   "5": {
+    "mae": 12.31,
+    "rmse": 16.14,
+    "r2": 0.472,
+    "n": 165,
+    "pers_mae": 12.77,
+    "pers_rmse": 17.38,
+    "skill_pct": 3.6,
+    "ridge_mae": 12.31,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 10.22,
+     "mlp": 17.46
+    },
+    "resid_sigma": 15.9
+   },
+   "6": {
+    "mae": 13.02,
+    "rmse": 17.17,
+    "r2": 0.402,
+    "n": 165,
+    "pers_mae": 13.4,
+    "pers_rmse": 18.95,
+    "skill_pct": 2.9,
+    "ridge_mae": 13.02,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 10.78,
+     "mlp": 16.45
+    },
+    "resid_sigma": 17.0
+   },
+   "7": {
+    "mae": 13.24,
+    "rmse": 17.49,
+    "r2": 0.381,
+    "n": 164,
+    "pers_mae": 13.86,
+    "pers_rmse": 19.25,
+    "skill_pct": 4.4,
+    "ridge_mae": 13.24,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 11.98,
+     "mlp": 12.5
+    },
+    "resid_sigma": 17.24
+   }
+  },
+  "n_origins": 1318,
+  "holdout_start": "2026-02-17",
+  "forecast_origin": "2026-11-07",
+  "forecast": [
+   {
+    "date": "2026-11-08",
+    "pred": 36.88,
+    "lo": 25.32,
+    "hi": 48.45
+   },
+   {
+    "date": "2026-11-09",
+    "pred": 41.29,
+    "lo": 25.6,
+    "hi": 56.98
+   },
+   {
+    "date": "2026-11-10",
+    "pred": 46.21,
+    "lo": 29.16,
+    "hi": 63.25
+   },
+   {
+    "date": "2026-11-11",
+    "pred": 43.41,
+    "lo": 24.99,
+    "hi": 61.84
+   },
+   {
+    "date": "2026-11-12",
+    "pred": 39.08,
+    "lo": 18.7,
+    "hi": 59.46
+   },
+   {
+    "date": "2026-11-13",
+    "pred": 36.22,
+    "lo": 14.43,
+    "hi": 58.01
+   },
+   {
+    "date": "2026-11-14",
+    "pred": 34.14,
+    "lo": 12.05,
+    "hi": 56.23
+   }
+  ],
+  "latest": {
+   "last_price": 25.12,
+   "last_price_date": "2026-11-11",
+   "flow_cfs": 4840.0,
+   "flow_anom_pct": -9.8,
+   "soil_pct": 18.8,
+   "gas_usd": 2.6,
+   "precip7_mm": 40.1,
+   "temp7_c": 8.4,
+   "swe_in": 4.7
+  },
+  "features": [
+   "p_last",
+   "p_lag1",
+   "p_lag7",
+   "p_roll7",
+   "p_roll30",
+   "gas_lag1",
+   "gas_roll7",
+   "flow7",
+   "flow_anom",
+   "soil",
+   "soil7",
+   "precip7",
+   "temp7",
+   "snow7",
+   "swe",
+   "dow_sin",
+   "dow_cos",
+   "doy_sin",
+   "doy_cos"
+  ]
+ },
+ "np15": {
+  "cfg_name": "CAISO NP15 \u2014 Northern California",
+  "hub": "CAISO NP15 trading hub \u2014 day-ahead LMP, daily mean of hourly prices ($/MWh), from CAISO OASIS",
+  "price_rows": 1200,
+  "price_range": [
+   "2023-08-03",
+   "2026-11-14"
+  ],
+  "metrics": {
+   "1": {
+    "mae": 4.65,
+    "rmse": 6.37,
+    "r2": 0.844,
+    "n": 233,
+    "pers_mae": 4.8,
+    "pers_rmse": 6.86,
+    "skill_pct": 3.0,
+    "ridge_mae": 4.65,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 5.2,
+     "mlp": 11.36
+    },
+    "resid_sigma": 6.37
+   },
+   "2": {
+    "mae": 6.61,
+    "rmse": 8.59,
+    "r2": 0.717,
+    "n": 233,
+    "pers_mae": 7.01,
+    "pers_rmse": 9.62,
+    "skill_pct": 5.6,
+    "ridge_mae": 6.61,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 9.24,
+     "mlp": 15.09
+    },
+    "resid_sigma": 8.59
+   },
+   "3": {
+    "mae": 7.32,
+    "rmse": 9.38,
+    "r2": 0.663,
+    "n": 233,
+    "pers_mae": 7.75,
+    "pers_rmse": 10.54,
+    "skill_pct": 5.5,
+    "ridge_mae": 7.32,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 11.32,
+     "mlp": 16.72
+    },
+    "resid_sigma": 9.37
+   },
+   "4": {
+    "mae": 7.84,
+    "rmse": 9.84,
+    "r2": 0.629,
+    "n": 233,
+    "pers_mae": 8.13,
+    "pers_rmse": 11.05,
+    "skill_pct": 3.6,
+    "ridge_mae": 7.84,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 13.62,
+     "mlp": 24.99
+    },
+    "resid_sigma": 9.83
+   },
+   "5": {
+    "mae": 11.88,
+    "rmse": 16.11,
+    "r2": 0.009,
+    "n": 233,
+    "pers_mae": 8.46,
+    "pers_rmse": 11.36,
+    "skill_pct": -40.5,
+    "ridge_mae": 8.16,
+    "chosen": "mlp",
+    "val_mae": {
+     "ridge": 16.9,
+     "mlp": 16.52
+    },
+    "resid_sigma": 14.67
+   },
+   "6": {
+    "mae": 7.99,
+    "rmse": 10.36,
+    "r2": 0.59,
+    "n": 233,
+    "pers_mae": 8.5,
+    "pers_rmse": 11.57,
+    "skill_pct": 6.1,
+    "ridge_mae": 7.99,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 18.81,
+     "mlp": 28.58
+    },
+    "resid_sigma": 10.35
+   },
+   "7": {
+    "mae": 7.96,
+    "rmse": 10.12,
+    "r2": 0.608,
+    "n": 233,
+    "pers_mae": 8.28,
+    "pers_rmse": 11.28,
+    "skill_pct": 3.9,
+    "ridge_mae": 7.96,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 20.78,
+     "mlp": 26.61
+    },
+    "resid_sigma": 10.11
+   }
+  },
+  "n_origins": 1164,
+  "holdout_start": "2026-03-20",
+  "forecast_origin": "2026-11-07",
+  "forecast": [
+   {
+    "date": "2026-11-08",
+    "pred": 44.21,
+    "lo": 36.05,
+    "hi": 52.37
+   },
+   {
+    "date": "2026-11-09",
+    "pred": 51.28,
+    "lo": 40.27,
+    "hi": 62.28
+   },
+   {
+    "date": "2026-11-10",
+    "pred": 57.0,
+    "lo": 44.99,
+    "hi": 69.0
+   },
+   {
+    "date": "2026-11-11",
+    "pred": 60.2,
+    "lo": 47.61,
+    "hi": 72.79
+   },
+   {
+    "date": "2026-11-12",
+    "pred": 51.19,
+    "lo": 32.39,
+    "hi": 69.99
+   },
+   {
+    "date": "2026-11-13",
+    "pred": 52.48,
+    "lo": 39.21,
+    "hi": 65.74
+   },
+   {
+    "date": "2026-11-14",
+    "pred": 46.53,
+    "lo": 33.57,
+    "hi": 59.49
+   }
+  ],
+  "latest": {
+   "last_price": 36.67,
+   "last_price_date": "2026-11-14",
+   "flow_cfs": 4250.0,
+   "flow_anom_pct": -59.4,
+   "soil_pct": 21.6,
+   "gas_usd": 2.6,
+   "precip7_mm": 11.3,
+   "temp7_c": 7.7,
+   "swe_in": 1.83
+  },
+  "features": [
+   "p_last",
+   "p_lag1",
+   "p_lag7",
+   "p_roll7",
+   "p_roll30",
+   "gas_lag1",
+   "gas_roll7",
+   "flow7",
+   "flow_anom",
+   "soil",
+   "soil7",
+   "precip7",
+   "temp7",
+   "snow7",
+   "swe",
+   "dow_sin",
+   "dow_cos",
+   "doy_sin",
+   "doy_cos"
+  ]
+ },
+ "midc": {
+  "cfg_name": "Mid-Columbia \u2014 Pacific Northwest",
+  "hub": "Mid-Columbia hub \u2014 ICE day-ahead peak index (weighted avg $/MWh), republished by EIA",
+  "price_rows": 896,
+  "price_range": [
+   "2022-12-29",
+   "2026-11-11"
+  ],
+  "metrics": {
+   "1": {
+    "mae": 10.49,
+    "rmse": 14.38,
+    "r2": 0.703,
+    "n": 164,
+    "pers_mae": 10.85,
+    "pers_rmse": 15.06,
+    "skill_pct": 3.3,
+    "ridge_mae": 10.49,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 11.05,
+     "mlp": 15.24
+    },
+    "resid_sigma": 14.32
+   },
+   "2": {
+    "mae": 12.14,
+    "rmse": 16.69,
+    "r2": 0.6,
+    "n": 164,
+    "pers_mae": 12.56,
+    "pers_rmse": 17.7,
+    "skill_pct": 3.4,
+    "ridge_mae": 12.14,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 17.84,
+     "mlp": 38.02
+    },
+    "resid_sigma": 16.68
+   },
+   "3": {
+    "mae": 12.74,
+    "rmse": 17.45,
+    "r2": 0.56,
+    "n": 165,
+    "pers_mae": 13.58,
+    "pers_rmse": 19.2,
+    "skill_pct": 6.2,
+    "ridge_mae": 12.74,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 14.69,
+     "mlp": 27.65
+    },
+    "resid_sigma": 17.45
+   },
+   "4": {
+    "mae": 12.89,
+    "rmse": 17.39,
+    "r2": 0.563,
+    "n": 165,
+    "pers_mae": 13.1,
+    "pers_rmse": 17.71,
+    "skill_pct": 1.6,
+    "ridge_mae": 12.89,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 15.98,
+     "mlp": 40.92
+    },
+    "resid_sigma": 17.39
+   },
+   "5": {
+    "mae": 13.4,
+    "rmse": 17.86,
+    "r2": 0.539,
+    "n": 165,
+    "pers_mae": 13.64,
+    "pers_rmse": 18.33,
+    "skill_pct": 1.7,
+    "ridge_mae": 13.4,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 16.94,
+     "mlp": 48.47
+    },
+    "resid_sigma": 17.86
+   },
+   "6": {
+    "mae": 14.59,
+    "rmse": 18.89,
+    "r2": 0.484,
+    "n": 165,
+    "pers_mae": 14.69,
+    "pers_rmse": 19.52,
+    "skill_pct": 0.7,
+    "ridge_mae": 14.59,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 17.86,
+     "mlp": 41.87
+    },
+    "resid_sigma": 18.86
+   },
+   "7": {
+    "mae": 14.85,
+    "rmse": 19.56,
+    "r2": 0.45,
+    "n": 164,
+    "pers_mae": 14.85,
+    "pers_rmse": 20.3,
+    "skill_pct": -0.0,
+    "ridge_mae": 14.85,
+    "chosen": "ridge",
+    "val_mae": {
+     "ridge": 22.2,
+     "mlp": 53.63
+    },
+    "resid_sigma": 19.43
+   }
+  },
+  "n_origins": 1318,
+  "holdout_start": "2026-02-17",
+  "forecast_origin": "2026-11-07",
+  "forecast": [
+   {
+    "date": "2026-11-08",
+    "pred": 38.21,
+    "lo": 19.85,
+    "hi": 56.56
+   },
+   {
+    "date": "2026-11-09",
+    "pred": 43.66,
+    "lo": 22.28,
+    "hi": 65.04
+   },
+   {
+    "date": "2026-11-10",
+    "pred": 45.41,
+    "lo": 23.06,
+    "hi": 67.77
+   },
+   {
+    "date": "2026-11-11",
+    "pred": 45.41,
+    "lo": 23.13,
+    "hi": 67.69
+   },
+   {
+    "date": "2026-11-12",
+    "pred": 45.43,
+    "lo": 22.54,
+    "hi": 68.33
+   },
+   {
+    "date": "2026-11-13",
+    "pred": 43.81,
+    "lo": 19.64,
+    "hi": 67.99
+   },
+   {
+    "date": "2026-11-14",
+    "pred": 42.27,
+    "lo": 17.37,
+    "hi": 67.17
+   }
+  ],
+  "latest": {
+   "last_price": 43.33,
+   "last_price_date": "2026-11-11",
+   "flow_cfs": 58935.0,
+   "flow_anom_pct": -43.1,
+   "soil_pct": 15.4,
+   "gas_usd": 2.6,
+   "precip7_mm": 11.9,
+   "temp7_c": -0.3,
+   "swe_in": 1.63
+  },
+  "features": [
+   "p_last",
+   "p_lag1",
+   "p_lag7",
+   "p_roll7",
+   "p_roll30",
+   "gas_lag1",
+   "gas_roll7",
+   "flow7",
+   "flow_anom",
+   "soil",
+   "soil7",
+   "precip7",
+   "temp7",
+   "snow7",
+   "swe",
+   "dow_sin",
+   "dow_cos",
+   "doy_sin",
+   "doy_cos"
+  ]
+ }
+}

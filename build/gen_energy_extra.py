@@ -22,8 +22,51 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import os
+import os, shutil
 WS = Path(os.environ.get("HTE_WS", Path.home() / "workspace" / "hydrotwin_energy"))
+MERGED_ROOT = Path(os.environ.get("MERGED_ROOT", Path(__file__).resolve().parent.parent))
+
+
+def _reconcile_energy_ws():
+    """Fill gaps in the energy workspace (HTE_WS) from inputs bundled in this
+    repo under build/energy_inputs/.
+
+    Why: the hydrotwin-energy GitHub repo ships only its pipeline code and a
+    root-level snapshot — its data/ raw cache (which pipeline.py reads via
+    ROOT/data/raw) and site/data.js (read by this script for the sanity
+    check) exist only in the local workspace and were never pushed, so a
+    build from repo clones alone (e.g. GitHub Actions) cannot find them.
+    Copies of both are bundled here. Only files MISSING in the workspace are
+    copied; existing files are never overwritten, so runs against the full
+    local workspace behave exactly as before. Must run BEFORE the pipeline
+    module is imported (its fetchers fall back to network downloads for any
+    raw file they cannot find in the cache).
+    """
+    bundled = MERGED_ROOT / "build" / "energy_inputs"
+    if not bundled.is_dir():
+        return
+    copied = 0
+    src = bundled / "site" / "data.js"
+    dst = WS / "site" / "data.js"
+    if src.is_file() and not dst.exists():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        copied += 1
+    src_data = bundled / "data"
+    if src_data.is_dir():
+        for f in sorted(src_data.rglob("*")):
+            if f.is_file():
+                d = WS / "data" / f.relative_to(src_data)
+                if not d.exists():
+                    d.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, d)
+                    copied += 1
+    if copied:
+        print(f"energy workspace reconciled from bundled inputs: "
+              f"{copied} file(s) copied into {WS}", flush=True)
+
+
+_reconcile_energy_ws()
 spec = importlib.util.spec_from_file_location("epipe", WS / "pipeline" / "pipeline.py")
 P = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(P)

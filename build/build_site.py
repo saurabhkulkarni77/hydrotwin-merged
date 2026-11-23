@@ -19,6 +19,41 @@ SITE = ROOT / "site"
 BUILD = ROOT / "build"
 ENERGY_WS = Path(os.environ.get("HTE_WS", Path.home() / "workspace" / "hydrotwin_energy"))
 
+
+def _reconcile_energy_ws():
+    """Fill gaps in the energy workspace (HTE_WS) from inputs bundled in this
+    repo under build/energy_inputs/.
+
+    Why: the hydrotwin-energy GitHub repo does not contain site/data.js (the
+    shipped snapshot this script copies into energy/data.js) — it exists only
+    in the local workspace. A copy is bundled here. Only files MISSING in the
+    workspace are copied; existing files are never overwritten. (In the
+    Actions workflow gen_energy_extra.py runs first and already reconciles,
+    so this is a no-op there; it keeps build_site.py runnable standalone.)
+    """
+    bundled = ROOT / "build" / "energy_inputs"
+    if not bundled.is_dir():
+        return
+    copied = 0
+    src = bundled / "site" / "data.js"
+    dst = ENERGY_WS / "site" / "data.js"
+    if src.is_file() and not dst.exists():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        copied += 1
+    src_data = bundled / "data"
+    if src_data.is_dir():
+        for f in sorted(src_data.rglob("*")):
+            if f.is_file():
+                d = ENERGY_WS / "data" / f.relative_to(src_data)
+                if not d.exists():
+                    d.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, d)
+                    copied += 1
+    if copied:
+        print(f"energy workspace reconciled from bundled inputs: "
+              f"{copied} file(s) copied into {ENERGY_WS}")
+
 # The shared panel CSS lives in the river station pages themselves (ht-statsview).
 def _statsview_css():
     page = (RIVER / "stations" / "USGS-01463500.html").read_text()
@@ -526,6 +561,7 @@ def scene_page(rid, token):
 
 
 def main():
+    _reconcile_energy_ws()
     if SITE.exists():
         shutil.rmtree(SITE)
     shutil.copytree(RIVER, SITE, ignore=shutil.ignore_patterns(".git"))
