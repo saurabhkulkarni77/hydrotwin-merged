@@ -1,0 +1,22 @@
+/* HydroTwin Energy — hub page for the merged twin. All values from data.js. */
+(function () {
+  "use strict";
+  const D = window.HTE_DATA;
+  const $ = id => document.getElementById(id);
+  const fmt = (n, d) => (n === null || n === undefined || isNaN(n)) ? "—" : Number(n).toFixed(d === undefined ? 2 : d);
+  $("hub-cards").innerHTML = D.regions.map(r => {
+    const mean = [1, 2, 3, 4, 5, 6, 7].reduce((a, h) => a + r.metrics[h].skill_pct, 0) / 7;
+    return `<div class="hts-card" style="padding:16px">
+      <div class="hts-cl">Energy region</div>
+      <div style="font-size:17px;font-weight:700;margin:4px 0"><a href="${r.id}.html" style="color:#F5F6F2;text-decoration:none">${r.name}</a></div>
+      <div class="hts-cd">${r.hub}</div>
+      <div class="hts-cv" style="font-size:19px">$${fmt(r.latest.last_price)} <span style="font-size:12px;color:#9FB3C8">latest, ${r.latest.last_price_date}</span></div>
+      <div class="hts-cd">+1d MAE $${fmt(r.metrics[1].mae)} · skill ${fmt(r.metrics[1].skill_pct, 1)}% · mean skill +1..+7d ${fmt(mean, 1)}%</div>
+      <div style="margin-top:8px"><a class="hts-navbtn" href="${r.id}.html">Open region →</a></div>
+    </div>`;
+  }).join("");
+  $("hub-pool").innerHTML =
+    "<tr><th>Region</th><th>+1d MAE $</th><th>+1d RMSE $</th><th>+1d skill</th><th>+7d MAE $</th><th>+7d skill</th><th>Holdout origins</th><th>Holdout from</th></tr>" +
+    D.regions.map(r => `<tr><td>${r.name}</td><td>${fmt(r.metrics[1].mae)}</td><td>${fmt(r.metrics[1].rmse)}</td><td>${fmt(r.metrics[1].skill_pct, 1)}%</td><td>${fmt(r.metrics[7].mae)}</td><td>${fmt(r.metrics[7].skill_pct, 1)}%</td><td>${r.holdout_origins}</td><td>${r.holdout_start}</td></tr>`).join("");
+  $("hub-note").textContent = D.meta.note;
+})();
