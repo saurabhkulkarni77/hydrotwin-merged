@@ -276,6 +276,100 @@
     "<tr><th>Horizon</th><th>Residual σ $</th><th>Band half width (±1.2816σ) $</th></tr>" +
     MH.map(h => { const m = R.metrics[h]; return `<tr><td>+${h}d</td><td>${fmt(m.resid_sigma)}</td><td>${fmt(1.2816 * m.resid_sigma)}</td></tr>`; }).join("");
 
+  /* ---------- generation cost anchors ---------- */
+  function drawCostAnchors() {
+    const CA = E.cost_anchors, WB = X.cost_workbook;
+    if (!CA || !WB) return;
+    const dist = CA.dist, bands = WB.bands;
+    // bands vs observed price distribution
+    {
+      const cv = $("cv-bands"); const [ctx, W, H] = setup(cv, 250);
+      const pad = { l: 168, r: 16, t: 12, b: 24 };
+      const xmax = Math.max(...bands.map(b => b.lcoe_hi_usd_mwh), dist.p90) * 1.08;
+      const X0 = pad.l, X1 = W - pad.r;
+      const fx = v => X0 + (X1 - X0) * v / xmax;
+      ctx.strokeStyle = "#22344C"; ctx.fillStyle = GREY; ctx.font = "11px Arial"; ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const v = xmax * i / 4, x = fx(v);
+        ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, H - pad.b); ctx.stroke();
+        ctx.fillText("$" + fmt(v, 0), x - 12, H - 8);
+      }
+      const rows = bands.length + 1, rh = (H - pad.t - pad.b) / rows;
+      bands.forEach((b, i) => {
+        const y = pad.t + rh * i + rh * 0.22, h = rh * 0.56;
+        ctx.fillStyle = "rgba(88,150,230,.45)";
+        ctx.fillRect(fx(b.lcoe_lo_usd_mwh), y, fx(b.lcoe_hi_usd_mwh) - fx(b.lcoe_lo_usd_mwh), h);
+        ctx.fillStyle = "#E6EDF5"; ctx.textAlign = "right";
+        ctx.fillText(b.technology, X0 - 8, y + h / 2 + 4); ctx.textAlign = "left";
+        ctx.fillStyle = GREY;
+        ctx.fillText("$" + fmt(b.lcoe_lo_usd_mwh, 0) + "–" + fmt(b.lcoe_hi_usd_mwh, 0), fx(b.lcoe_hi_usd_mwh) + 6, y + h / 2 + 4);
+      });
+      const y = pad.t + rh * bands.length + rh * 0.22, h = rh * 0.56, ym = y + h / 2;
+      ctx.fillStyle = "rgba(255,210,77,.35)";
+      ctx.fillRect(fx(dist.p10), y, fx(dist.p90) - fx(dist.p10), h);
+      ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(fx(dist.p50), y - 2); ctx.lineTo(fx(dist.p50), y + h + 2); ctx.stroke();
+      ctx.fillStyle = GOLD; ctx.save(); ctx.translate(fx(dist.mean), ym); ctx.rotate(Math.PI / 4);
+      ctx.fillRect(-4, -4, 8, 8); ctx.restore();
+      ctx.fillStyle = "#E6EDF5"; ctx.textAlign = "right";
+      ctx.fillText("This hub — observed prices", X0 - 8, ym + 4); ctx.textAlign = "left";
+      ctx.fillStyle = GREY; ctx.lineWidth = 1;
+      ctx.fillText("P10 $" + fmt(dist.p10) + " · median $" + fmt(dist.p50) + " · mean $" + fmt(dist.mean) + " · P90 $" + fmt(dist.p90), fx(dist.p90) + 6, ym + 4);
+    }
+    $("ca-tbl").innerHTML =
+      "<tr><th>Technology — Lazard LCOE+ 2026 (unsubsidized)</th><th>LCOE low $/MWh</th><th>LCOE high $/MWh</th><th>Capacity factor</th></tr>" +
+      bands.map(b => `<tr><td>${b.technology}</td><td>${fmt(b.lcoe_lo_usd_mwh, 0)}</td><td>${fmt(b.lcoe_hi_usd_mwh, 0)}</td><td>${b.capacity_factor || "—"}</td></tr>`).join("") +
+      `<tr class="hts-cur"><td>This hub — observed day-ahead prices, ${dist.first} → ${dist.last} (${dist.n} priced days)</td><td>P10 ${fmt(dist.p10)}</td><td>P90 ${fmt(dist.p90)}</td><td>median ${fmt(dist.p50)} · mean ${fmt(dist.mean)}</td></tr>`;
+    // implied gas marginal cost vs hub price, latest 90 priced days
+    {
+      const S = CA.mc_series.filter(r => r.mc_cc !== null && r.mc_peak !== null);
+      const cv = $("cv-mc"); const [ctx, W, H] = setup(cv, 240);
+      const pad = { l: 52, r: 10, t: 10, b: 22 };
+      const all = S.flatMap(r => [r.price, r.mc_cc, r.mc_peak]);
+      let ymin = Math.min(...all), ymax = Math.max(...all);
+      const mg = (ymax - ymin) * 0.08 || 1; ymin -= mg; ymax += mg;
+      axes(ctx, W, H, pad, ymin, ymax, "$/MWh");
+      const X0 = pad.l, X1 = W - pad.r, Y0 = pad.t, Y1 = H - pad.b;
+      const fx = i => i / (S.length - 1), fy = v => (v - ymin) / (ymax - ymin);
+      line(ctx, S.map((r, i) => [fx(i), fy(r.mc_peak)]), X0, X1, Y0, Y1, GOLD, 1.3);
+      line(ctx, S.map((r, i) => [fx(i), fy(r.mc_cc)]), X0, X1, Y0, Y1, GREEN, 1.3);
+      line(ctx, S.map((r, i) => [fx(i), fy(r.price)]), X0, X1, Y0, Y1, BLUE, 1.7);
+      ctx.font = "11px Arial";
+      ctx.fillStyle = BLUE; ctx.fillText("— hub price", X0 + 4, pad.t + 4);
+      ctx.fillStyle = GREEN; ctx.fillText("— gas CC marginal cost", X0 + 92, pad.t + 4);
+      ctx.fillStyle = GOLD; ctx.fillText("— gas peaking marginal cost", X0 + 252, pad.t + 4);
+      ctx.fillStyle = GREY;
+      ctx.fillText(S[0].d, X0, H - 6); ctx.fillText(S[S.length - 1].d, X1 - 62, H - 6);
+    }
+    // capital cost anchors (context only)
+    const gasNuc = WB.eia_overnight.filter(r => r.heat_rate_btu_kwh &&
+      (r.technology.includes("Combined cycle") || r.technology.includes("Combustion turbine") ||
+       r.technology.includes("Aeroderivative") || r.category === "Nuclear"));
+    const capRow = (name, kw, note) => `<tr><td>${name}</td><td>${kw}</td><td>${note}</td></tr>`;
+    $("ca-cap-tbl").innerHTML =
+      "<tr><th>Technology / project</th><th>Overnight cost $/kW</th><th>Workbook values</th></tr>" +
+      gasNuc.map(r => capRow(r.technology + " (EIA 2024)", fmt(r.overnight_usd_kw, 0),
+        "heat rate " + fmt(r.heat_rate_btu_kwh, 0) + " Btu/kWh · var O&M $" + fmt(r.vom_usd_mwh) +
+        "/MWh · fixed O&M $" + fmt(r.fom_usd_kw_yr) + "/kW-yr")).join("") +
+      capRow(WB.smr_range.label, fmt(WB.smr_range.cost_per_kw_lo, 0) + " – " + fmt(WB.smr_range.cost_per_kw_hi, 0),
+             WB.smr_range.projects.join("; ") + " — reported project costs (workbook, Real projects sheet)") +
+      WB.real_projects.filter(r => (r.technology || "").includes("Geothermal")).map(r =>
+        capRow(r.project, fmt(r.cost_per_kw, 0) + " " + r.currency, r.status || "")).join("");
+    const cc = WB.gas_mc.techs.find(t => t.key === "cc"), pk = WB.gas_mc.techs.find(t => t.key === "peak");
+    const hasMc = (R.features || []).includes("mc_cc");
+    $("ca-note").innerHTML =
+      "Attribution: " + WB.eia_source + " " + WB.lazard_source +
+      " Workbook: " + WB.source_workbook + " (all source pages opened 23 Nov 2026). " +
+      "Implied marginal cost inputs: gas combined cycle heat rate " + fmt(cc.heat_rate_btu_kwh, 0) +
+      " Btu/kWh, variable O&M $" + fmt(cc.vom_usd_mwh) + "/MWh (mean of the EIA sheet's " +
+      cc.configs.join(" and ") + "); gas peaking " + fmt(pk.heat_rate_btu_kwh, 0) +
+      " Btu/kWh, $" + fmt(pk.vom_usd_mwh) + "/MWh (" + pk.configs.join(" and ") + "). " +
+      (hasMc
+        ? "This region's models were trained with mc_cc, mc_cc7, mc_peak and mc_peak7 — the two marginal cost series and their 7 day means — among their features; their weight shows in the feature importance, correlation and ablation panels."
+        : "The marginal cost series above is context for this region; it is not among the region's current model features.") +
+      " Sources: " + WB.sources.map(s => `<a href="${s.link}" style="color:#8FC1F2">${s.name}</a>`).join(" · ");
+  }
+
   /* ---------- live conditions sparks ---------- */
   function spark(cvId, pts, color, unit) {
     const cv = $(cvId); if (!cv || !pts || !pts.length) return;
@@ -634,7 +728,7 @@
   }
   $("fi-h").onchange = () => { drawFeatimp(); if (mode3d === "feat") c3.render(); };
 
-  function drawAll() { drawHistory(); drawMoving(); drawOutlook(); drawLead(); drawFeatimp(); drawCorr(); drawOutlooks(); drawYearly(); drawRegimes(); drawMlops(); surfCtl.render(); c3.render(); }
+  function drawAll() { drawHistory(); drawMoving(); drawOutlook(); drawLead(); drawFeatimp(); drawCorr(); drawOutlooks(); drawYearly(); drawRegimes(); drawMlops(); drawCostAnchors(); surfCtl.render(); c3.render(); }
   window.addEventListener("resize", drawAll);
   drawAll();
 })();

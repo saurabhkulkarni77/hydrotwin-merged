@@ -188,6 +188,19 @@ def region_page(rid):
     <p class="hts-note">Ridge model refit on the training origins with one feature group removed at a time, scored on the same holdout. A positive Δ means the group was helping. Computed for this merged build by the energy pipeline's own feature code.</p>
   </section>
 
+  <section class="hts-sec" id="sec-costs">
+    <h2>Generation cost anchors</h2>
+    <p class="hts-note">Where this hub's prices sit against what it costs to generate. The gold band is this hub's own observed price distribution over the full record (10th to 90th percentile, tick at the median, diamond at the mean); the blue bands are levelized cost of energy ranges by technology from the project's power plant cost workbook (Lazard LCOE+, July 2026, unsubsidized). A hub whose prices usually clear below a technology's LCOE band is not paying that technology's full cost of new entry — it is paying the marginal cost of whatever plant is on the margin, which for gas is drawn below.</p>
+    <canvas id="cv-bands" class="hts-cv" width="1320" height="250"></canvas>
+    <table class="hts-tbl" id="ca-tbl" style="margin-top:10px"></table>
+    <h3>Implied gas marginal cost vs hub price — latest 90 priced days</h3>
+    <canvas id="cv-mc" class="hts-cv" width="1320" height="240"></canvas>
+    <p class="hts-note">The two lower lines are not prices: they are the implied marginal cost of gas fired generation, computed from the workbook's EIA heat rates and variable O&amp;M at each day's Henry Hub gas price (marginal cost = heat rate / 1000 × gas + variable O&amp;M). When the hub price rises toward the peaking line, simple cycle turbines are setting the price; when it hugs the combined cycle line, efficient gas is on the margin. This spark spread relationship is also the one genuinely time varying signal the workbook contributes to the models: the two marginal cost series (and their 7 day means) are model features whenever this region's feature list shows mc_cc and mc_peak. The LCOE bands and capital costs, being constants per technology, are context anchors only — they are never model features.</p>
+    <h3>Capital cost anchors (context, not features)</h3>
+    <table class="hts-tbl" id="ca-cap-tbl"></table>
+    <p class="hts-note" id="ca-note"></p>
+  </section>
+
   <section class="hts-sec" id="sec-weekly">
     <h2>Weekly outlook</h2>
     <canvas id="cv-weekly" class="hts-cv" width="1320" height="250"></canvas>
@@ -262,7 +275,7 @@ def region_page(rid):
 
   <section class="hts-sec" id="sec-regimes">
     <h2>Market regimes — day clusters</h2>
-    <p class="hts-note">The river twin clusters its 14 stations by how their rivers behave; three regions cannot be clustered meaningfully, so this panel clusters DAYS instead. Every forecast origin day is a point in this region's standardized daily feature space (the 19 model features plus 7 day price volatility), grouped by k means with k chosen by silhouette score. Days in one regime share a market character. The table gives each regime's size and price statistics; regime names are assigned by rule from those statistics, not by hand. The scatter shows the days in the first two principal components of the same features, and the timeline shows when each regime occurred.</p>
+    <p class="hts-note">The river twin clusters its 14 stations by how their rivers behave; three regions cannot be clustered meaningfully, so this panel clusters DAYS instead. Every forecast origin day is a point in this region's standardized daily feature space (the model features plus 7 day price volatility), grouped by k means with k chosen by silhouette score. Days in one regime share a market character. The table gives each regime's size and price statistics; regime names are assigned by rule from those statistics, not by hand. The scatter shows the days in the first two principal components of the same features, and the timeline shows when each regime occurred.</p>
     <table class="hts-tbl" id="rgm-tbl"></table>
     <h3>Days in feature space (PCA)</h3>
     <canvas id="cv-rgm-pca" class="hts-cv" width="1320" height="300"></canvas>
@@ -346,7 +359,7 @@ HUB = f"""<!doctype html>
 
   <section class="hts-sec">
     <h2>How the merge works</h2>
-    <p class="hts-note">This merged twin keeps the river twin exactly as it was — all 14 stations, their 3D scenes and every panel — and adds the energy twin's three regions as first class pages next to them, reachable from the same station list on the map page. Energy forecasts come from the HydroTwin Energy models: the same model roster as the river twin (ridge, MLP, Random Forest, MiniRocket, LSTM, physics informed LSTM, Transformer, Temporal Fusion Transformer, PatchTST, two Gaussian processes, a graph convolutional network over the three regions, ARIMA and SARIMA) on the signed log price change, selected per horizon on a validation slice and scored once on a time based holdout against persistence, using 19 daily features built from USGS flow, NRCS soil and snow, Open-Meteo weather and Henry Hub gas — the same public feeds the river twin uses. Weekly and monthly outlooks are trained the same way at their own scales, with ridge, climatology, Transformer and SARIMA as candidates; the yearly outlook is a monthly climatology shown next to a SARIMA line for comparison, because a few years of prices cannot support a fitted yearly model on their own.</p>
+    <p class="hts-note">This merged twin keeps the river twin exactly as it was — all 14 stations, their 3D scenes and every panel — and adds the energy twin's three regions as first class pages next to them, reachable from the same station list on the map page. Energy forecasts come from the HydroTwin Energy models: the same model roster as the river twin (ridge, MLP, Random Forest, MiniRocket, LSTM, physics informed LSTM, Transformer, Temporal Fusion Transformer, PatchTST, two Gaussian processes, a graph convolutional network over the three regions, ARIMA and SARIMA) on the signed log price change, selected per horizon on a validation slice and scored once on a time based holdout against persistence, using daily features built from USGS flow, NRCS soil and snow, Open-Meteo weather and Henry Hub gas — the same public feeds the river twin uses — plus, for the gas fired fleet, implied marginal cost features derived from the project's power plant cost workbook (EIA heat rates and variable O&amp;M evaluated on the daily gas price). Weekly and monthly outlooks are trained the same way at their own scales, with ridge, climatology, Transformer and SARIMA as candidates; the yearly outlook is a monthly climatology shown next to a SARIMA line for comparison, because a few years of prices cannot support a fitted yearly model on their own.</p>
     <p class="hts-note">Three honest differences from the river pages remain, and each region page states them in its notebook: the yearly outlook is a climatology (with a SARIMA comparison line) rather than a fitted yearly model; the 3D scene pages show the hub's real geography with price panels but no flow ribbons or flood layers (a price hub has no gauge reach); and the clusters panel clusters days into market regimes rather than stations, which three regions cannot support.</p>
   </section>
 </div>
