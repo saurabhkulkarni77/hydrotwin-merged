@@ -422,7 +422,8 @@
     line(ctx, ser.map((p, i) => [fx(i), fy(p.v)]), X0, X1, Y0, Y1, BLUE, 1.4);
     line(ctx, [[fx(ser.length - 1), fy(ser[ser.length - 1].v)]].concat(fc.map((f, i) => [fx(ser.length + i), fy(f.pred)])), X0, X1, Y0, Y1, GREEN, 1.8);
     ctx.fillStyle = GREY; ctx.font = "11px Arial";
-    ctx.fillText(ser[0].d, X0, H - 6); ctx.fillText(fc[fc.length - 1].date, X1 - 62, H - 6);
+    ctx.fillText(ser[0].d, X0, H - 6);
+    if (fc.length) ctx.fillText(fc[fc.length - 1].date, X1 - 62, H - 6);
     $(tblId).innerHTML =
       "<tr><th>Horizon</th><th>Model</th><th>MAE $</th><th>RMSE $</th><th>R²</th><th>Persistence MAE $</th><th>Skill vs persistence</th><th>n</th></tr>" +
       Object.keys(O.metrics).sort((a, b) => a - b).map(h => {
