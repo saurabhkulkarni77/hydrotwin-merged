@@ -127,7 +127,7 @@ def region_page(rid):
     <div class="hts-title">
       <h1 id="rg-name">Loading…</h1>
       <div class="hts-sub" id="rg-hub"></div>
-      <div class="hts-sub2">Wholesale electricity price twin — same panel set as the river station pages, driven by the HydroTwin Energy models (ridge / MLP per horizon, selected on validation, scored on a time based holdout against persistence).</div>
+      <div class="hts-sub2">Wholesale electricity price twin — same panel set as the river station pages, driven by the HydroTwin Energy models (the full shared roster per horizon, selected on validation, scored on a time based holdout against persistence).</div>
       <span class="hts-span" id="rg-span"></span>
     </div>
     <nav class="hts-nav">
@@ -173,13 +173,13 @@ def region_page(rid):
     <canvas id="cv-lead" class="hts-cv" width="1320" height="220"></canvas>
     <h3>All energy regions (pooled view)</h3>
     <table class="hts-tbl" id="pool-tbl"></table>
-    <p class="hts-note">Honest headline, carried over from the original HydroTwin Energy build: skill against persistence is small (about 0 to 6 percent on MAE) and is negative at some horizons — the +5 day line for CAISO NP15 is the known miss, where the validation selected MLP scored worse than persistence on the holdout. The tables above show every horizon, good and bad.</p>
+    <p class="hts-note">Honest headline: skill against persistence is small (a few percent on MAE for the best models) and is negative at some horizons and for some models. The tables show every horizon and every model, good and bad.</p>
   </section>
 
   <section class="hts-sec" id="sec-compare">
-    <h2>Model compare — ridge vs MLP</h2>
+    <h2>Model compare — the full shared roster</h2>
     <table class="hts-tbl" id="cmp-tbl"></table>
-    <p class="hts-note">Per horizon, ridge and MLP are both fit on the training period and compared on a validation slice (the last 20 percent of training). The winner is refit on the full training period and scored once on the holdout. Models predict the signed log price change from the last observed price, so persistence is the anchor they must beat; predictions are clipped to the training period's observed price range (maximum extended 25 percent).</p>
+    <p class="hts-note">This twin runs the SAME model roster as the HydroTwin river twin, so the two are directly comparable: ridge, MLP, Random Forest and MiniRocket, plus the paper roster — LSTM, physics informed LSTM, Transformer, Temporal Fusion Transformer, PatchTST, two Gaussian process models, a graph convolutional network, ARIMA and seasonal ARIMA. Per horizon, every model is fit on the training period and compared on a validation slice (the last 20 percent of training); the winner is refit on the full training period and scored once on the holdout, and the table shows every model's holdout MAE with the selected model in bold. Two adaptations are energy specific and stated plainly: the physics informed LSTM's penalty pulls predictions toward an equilibrium price implied by the exogenous drivers (gas price, temperature, hydro flow) fit on training data only — a driver equilibrium penalty, not river physics; and the graph convolutional network's nodes are the three price regions, linked by the similarity of their training period price and feature regimes, the energy analogue of the river net's snow regime links. Models predict the signed log price change from the last observed price, so persistence is the anchor they must beat; predictions are clipped to the training period's observed price range (maximum extended 25 percent).</p>
   </section>
 
   <section class="hts-sec" id="sec-ablation">
@@ -194,7 +194,7 @@ def region_page(rid):
     <table class="hts-tbl" id="wk-tbl" style="margin-top:10px"></table>
     <h3>Issued outlook — next 12 weeks</h3>
     <table class="hts-tbl" id="wk-fc"></table>
-    <p class="hts-note">Weekly mean price models trained for this merged build on the region's real daily series, aggregated to weeks (weeks ending Sunday, at least 3 priced days each). Per horizon, a ridge on lagged weekly means, gas, flow and calendar features competes with a week of year climatology on a validation slice; the winner is refit on the training weeks and scored once on the holdout (<span id="wk-ho"></span>). The issued outlook refits the winner on all weeks. Same protocol as the daily models, one scale up — the river twin's weekly outlook slot, with energy models genuinely trained at the weekly scale.</p>
+    <p class="hts-note">Weekly mean price models trained for this merged build on the region's real daily series, aggregated to weeks (weeks ending Sunday, at least 3 priced days each). Per horizon, four candidates compete on a validation slice: a ridge on lagged weekly means, gas, flow and calendar features, a week of year climatology, a small Transformer over weekly feature windows, and a seasonal ARIMA (weekly period 52) rolled forward operationally; the winner is refit on the training weeks and scored once on the holdout (<span id="wk-ho"></span>). The issued outlook refits the winner on all weeks. Same protocol as the daily models, one scale up — the river twin's weekly outlook slot, with energy models genuinely trained at the weekly scale.</p>
   </section>
 
   <section class="hts-sec" id="sec-monthly">
@@ -203,7 +203,7 @@ def region_page(rid):
     <table class="hts-tbl" id="mo-tbl" style="margin-top:10px"></table>
     <h3>Issued outlook — next 6 months</h3>
     <table class="hts-tbl" id="mo-fc"></table>
-    <p class="hts-note">Monthly mean price models (months with at least 15 priced days), trained the same way as the weekly models: ridge on lagged monthly means, gas and calendar features against a calendar month climatology, winner by validation, scored once on the holdout (<span id="mo-ho"></span>). Read the n column before trusting a line: with only a few years of history the monthly holdout holds a handful of origins, so these scores are indicative, not precise.</p>
+    <p class="hts-note">Monthly mean price models (months with at least 15 priced days), trained the same way as the weekly models: ridge on lagged monthly means, gas and calendar features against a calendar month climatology, a small Transformer and a seasonal ARIMA (monthly period 12), winner by validation, scored once on the holdout (<span id="mo-ho"></span>). Read the n column before trusting a line: with only a few years of history the monthly holdout holds a handful of origins, so these scores are indicative, not precise.</p>
   </section>
 
   <section class="hts-sec" id="sec-yearly">
@@ -244,7 +244,7 @@ def region_page(rid):
     <h2>Features affecting price</h2>
     <div class="hts-ctl"><label>Horizon <select id="fi-h"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select> days</label></div>
     <canvas id="cv-featimp" class="hts-cv" width="1320" height="300"></canvas>
-    <p class="hts-note">Standardized ridge coefficients for the selected horizon (features are standardized before fitting, so coefficient size is comparable). Green pushes the price change up, red pushes it down. Shown for the ridge model, whose coefficients are directly readable; the MLP horizons are compared in the model compare table instead.</p>
+    <p class="hts-note">Standardized ridge coefficients for the selected horizon (features are standardized before fitting, so coefficient size is comparable). Green pushes the price change up, red pushes it down. Shown for the ridge model, whose coefficients are directly readable; every roster model is compared in the model compare table instead.</p>
   </section>
 
   <section class="hts-sec" id="sec-charts3d">
@@ -297,7 +297,7 @@ def region_page(rid):
     <h3>Known limitations</h3>
     <ul class="hts-note" id="nb-limits" style="margin:0;padding-left:18px"></ul>
     <h3>What still differs from the river pages</h3>
-    <p class="hts-note">Yearly outlook: the river twin fits yearly models on 25 years of flow; this region has only a few years of price history (the yearly panel states the exact span), so the yearly outlook here is a monthly climatology with its year to year spread, checked by leave-one-year-out validation instead of holdout scores — no fitted yearly model is claimed. 3D scene: the region's 3D page uses the same Google Photorealistic 3D Tiles scene as the river 3D pages, placed at the hub's real geography, but a price hub has no gauge reach, water surface or rating curve, so the scene carries the hub marker and the price panels rather than flow ribbons and flood layers. Clusters: the river panel clusters stations; the energy panel clusters days into market regimes (above), which is the genuine equivalent for three regions.</p>
+    <p class="hts-note">Yearly outlook: the river twin fits yearly models on 25 years of flow; this region has only a few years of price history (the yearly panel states the exact span), so the yearly outlook here is a monthly climatology with its year to year spread, checked by leave-one-year-out validation instead of holdout scores — no fitted yearly model is claimed; a seasonal ARIMA line fit on the monthly series is drawn next to it for comparison, with its own expanding window fold scores, because SARIMA is the river roster's yearly winner. 3D scene: the region's 3D page uses the same Google Photorealistic 3D Tiles scene as the river 3D pages, placed at the hub's real geography, but a price hub has no gauge reach, water surface or rating curve, so the scene carries the hub marker and the price panels rather than flow ribbons and flood layers. Clusters: the river panel clusters stations; the energy panel clusters days into market regimes (above), which is the genuine equivalent for three regions.</p>
   </section>
 
   <p class="hts-note" style="margin-top:14px">Merged twin: river pages and energy pages share one index. River data: USGS daily flow and weather, Oct 2001 to Sep 2026. Energy data: ICE day-ahead indices republished by EIA, CAISO OASIS, EIA Henry Hub, USGS, NRCS SNOTEL and SCAN, Open-Meteo.</p>
@@ -335,7 +335,7 @@ HUB = f"""<!doctype html>
   <section class="hts-sec">
     <h2>Pooled leaderboard — all 3 energy regions</h2>
     <table class="hts-tbl" id="hub-pool"></table>
-    <p class="hts-note">Honest headline from the original build: skill against persistence is small (about 0 to 6 percent on MAE), with one disclosed miss — CAISO NP15 at +5 days, where the validation selected MLP scored well below persistence on the holdout. Every region page shows all seven horizons, including the negative ones.</p>
+    <p class="hts-note">Honest headline: skill against persistence is small (a few percent on MAE for the best models) and negative at some horizons and for some models. Every region page shows all seven horizons and the full model roster, including the negative lines.</p>
   </section>
 
   <section class="hts-sec">
@@ -346,8 +346,8 @@ HUB = f"""<!doctype html>
 
   <section class="hts-sec">
     <h2>How the merge works</h2>
-    <p class="hts-note">This merged twin keeps the river twin exactly as it was — all 14 stations, their 3D scenes and every panel — and adds the energy twin's three regions as first class pages next to them, reachable from the same station list on the map page. Energy forecasts come from the HydroTwin Energy models: per horizon ridge or MLP on the signed log price change, selected on a validation slice and scored once on a time based holdout against persistence, using 19 daily features built from USGS flow, NRCS soil and snow, Open-Meteo weather and Henry Hub gas — the same public feeds the river twin uses. Weekly and monthly outlooks are trained the same way at their own scales; the yearly outlook is a monthly climatology, because a few years of prices cannot support a fitted yearly model.</p>
-    <p class="hts-note">Three honest differences from the river pages remain, and each region page states them in its notebook: the yearly outlook is a climatology rather than a fitted model; the 3D scene pages show the hub's real geography with price panels but no flow ribbons or flood layers (a price hub has no gauge reach); and the clusters panel clusters days into market regimes rather than stations, which three regions cannot support.</p>
+    <p class="hts-note">This merged twin keeps the river twin exactly as it was — all 14 stations, their 3D scenes and every panel — and adds the energy twin's three regions as first class pages next to them, reachable from the same station list on the map page. Energy forecasts come from the HydroTwin Energy models: the same model roster as the river twin (ridge, MLP, Random Forest, MiniRocket, LSTM, physics informed LSTM, Transformer, Temporal Fusion Transformer, PatchTST, two Gaussian processes, a graph convolutional network over the three regions, ARIMA and SARIMA) on the signed log price change, selected per horizon on a validation slice and scored once on a time based holdout against persistence, using 19 daily features built from USGS flow, NRCS soil and snow, Open-Meteo weather and Henry Hub gas — the same public feeds the river twin uses. Weekly and monthly outlooks are trained the same way at their own scales, with ridge, climatology, Transformer and SARIMA as candidates; the yearly outlook is a monthly climatology shown next to a SARIMA line for comparison, because a few years of prices cannot support a fitted yearly model on their own.</p>
+    <p class="hts-note">Three honest differences from the river pages remain, and each region page states them in its notebook: the yearly outlook is a climatology (with a SARIMA comparison line) rather than a fitted yearly model; the 3D scene pages show the hub's real geography with price panels but no flow ribbons or flood layers (a price hub has no gauge reach); and the clusters panel clusters days into market regimes rather than stations, which three regions cannot support.</p>
   </section>
 </div>
 <script src="data.js"></script>

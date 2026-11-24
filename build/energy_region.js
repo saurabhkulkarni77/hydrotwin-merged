@@ -175,12 +175,30 @@
 
   /* ---------- model statistics ---------- */
   const MH = [1, 2, 3, 4, 5, 6, 7];
+  const ROSTER = R.roster || [];
+  const MNAME = {};
+  ROSTER.forEach(m => { MNAME[m.key] = m.name; });
+  const mname = k => MNAME[k] || k;
   $("ms-tbl").innerHTML =
     "<tr><th>Horizon</th><th>Model</th><th>MAE $</th><th>RMSE $</th><th>R²</th><th>Persistence MAE $</th><th>Skill vs persistence</th><th>n</th></tr>" +
-    MH.map(h => { const m = R.metrics[h]; return `<tr><td>+${h}d</td><td>${m.chosen}</td><td>${fmt(m.mae)}</td><td>${fmt(m.rmse)}</td><td>${fmt(m.r2, 3)}</td><td>${fmt(m.pers_mae)}</td><td>${fmt(m.skill_pct, 1)}%</td><td>${m.n}</td></tr>`; }).join("");
+    MH.map(h => { const m = R.metrics[h]; return `<tr><td>+${h}d</td><td>${mname(m.chosen)}</td><td>${fmt(m.mae)}</td><td>${fmt(m.rmse)}</td><td>${fmt(m.r2, 3)}</td><td>${fmt(m.pers_mae)}</td><td>${fmt(m.skill_pct, 1)}%</td><td>${m.n}</td></tr>`; }).join("");
+  // full roster compare: every model's holdout MAE per horizon, the
+  // validation-selected model marked per horizon (from R.metrics[h].models,
+  // computed by the pipeline — nothing hardcoded here)
+  const cmpRows = ROSTER.map(rm => {
+    const cells = MH.map(h => {
+      const mm = (R.metrics[h].models || {})[rm.key];
+      const sel = R.metrics[h].chosen === rm.key;
+      if (!mm) return `<td class="${sel ? "hts-cur" : ""}">—</td>`;
+      if (mm.status !== "ok") return `<td class="${sel ? "hts-cur" : ""}" title="${(mm.reason || "failed").replace(/"/g, "'")}">failed</td>`;
+      return `<td class="${sel ? "hts-cur" : ""}">${sel ? "<b>" : ""}${fmt(mm.mae)}${sel ? "</b>" : ""}</td>`;
+    }).join("");
+    return `<tr><td>${rm.name}</td>${cells}</tr>`;
+  }).join("");
+  const persCells = MH.map(h => `<td>${fmt(R.metrics[h].pers_mae)}</td>`).join("");
   $("cmp-tbl").innerHTML =
-    "<tr><th>Horizon</th><th>Validation MAE ridge</th><th>Validation MAE MLP</th><th>Selected</th><th>Holdout MAE selected</th><th>Holdout MAE ridge</th><th>Holdout MAE persistence</th></tr>" +
-    MH.map(h => { const m = R.metrics[h]; return `<tr><td>+${h}d</td><td>${fmt(m.val_mae.ridge)}</td><td>${fmt(m.val_mae.mlp)}</td><td>${m.chosen}</td><td>${fmt(m.mae)}</td><td>${fmt(m.ridge_mae)}</td><td>${fmt(m.pers_mae)}</td></tr>`; }).join("");
+    "<tr><th>Model — holdout MAE $/MWh</th>" + MH.map(h => `<th>+${h}d</th>`).join("") + "</tr>" +
+    cmpRows + `<tr><td>Persistence (anchor)</td>${persCells}</tr>`;
   $("pool-tbl").innerHTML =
     "<tr><th>Region</th><th>+1d MAE $</th><th>+1d skill</th><th>+7d MAE $</th><th>+7d skill</th><th>Mean skill +1..+7d</th></tr>" +
     D.regions.map(r2 => {
@@ -334,9 +352,11 @@
   const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function drawYearly() {
     const Y = E.outlooks.yearly, O = Y.outlook;
+    const SAR = (Y.sarima && Y.sarima.outlook) ? Y.sarima.outlook : null;
     const cv = $("cv-yearly"); const [ctx, W, H] = setup(cv, 250);
     const pad = { l: 52, r: 10, t: 10, b: 22 };
-    const all = O.flatMap(o => [o.p75, o.p25]).filter(v => v !== null);
+    const all = O.flatMap(o => [o.p75, o.p25]).filter(v => v !== null)
+      .concat(SAR ? SAR.map(s => s.pred) : []);
     let ymin = Math.min(...all), ymax = Math.max(...all);
     const mg = (ymax - ymin) * 0.1 || 1; ymin -= mg; ymax += mg;
     axes(ctx, W, H, pad, ymin, ymax, "$/MWh");
@@ -347,6 +367,13 @@
     [...O].reverse().forEach((o, i) => { const x = X0 + (X1 - X0) * fx(O.length - 1 - i), y = Y1 - (Y1 - Y0) * fy(o.p25); ctx.lineTo(x, y); });
     ctx.closePath(); ctx.fill();
     line(ctx, O.map((o, i) => [fx(i), fy(o.mean)]), X0, X1, Y0, Y1, GOLD, 1.9);
+    if (SAR) {
+      ctx.save(); ctx.setLineDash([5, 4]);
+      line(ctx, SAR.map((s, i) => [fx(i), fy(s.pred)]), X0, X1, Y0, Y1, RED, 1.6);
+      ctx.restore();
+      ctx.fillStyle = GOLD; ctx.fillText("— climatology mean", X0 + 4, pad.t + 6);
+      ctx.fillStyle = RED; ctx.fillText("- - SARIMA", X0 + 130, pad.t + 6);
+    }
     ctx.fillStyle = GREY; ctx.font = "11px Arial";
     O.forEach((o, i) => { if (i % 2 === 0) ctx.fillText(MON[o.month - 1] + " " + o.date.slice(0, 4), X0 + (X1 - X0) * fx(i) - 18, H - 6); });
     $("yr-tbl").innerHTML =
@@ -361,7 +388,12 @@
       "The band is the middle half of those years (25th to 75th percentile): with so few years it is the spread of what " +
       "actually happened, not a confidence interval. Leave-one-year-out check of this climatology — predicting each year " +
       "from only the years before it: " + Y.folds.map(f => f.year + " MAE $" + fmt(f.mae) + " over " + f.n_months + " months").join("; ") +
-      "; overall MAE $" + fmt(Y.loyo_mae) + "/MWh. Treat the outlook as a seasonal guide, not a forecast with daily model accuracy.";
+      "; overall MAE $" + fmt(Y.loyo_mae) + "/MWh. Treat the outlook as a seasonal guide, not a forecast with daily model accuracy." +
+      (SAR ? " The dashed line is a seasonal ARIMA (SARIMA (1,1,1)(1,0,1,12)) fit on the monthly mean series, drawn for comparison " +
+        "because SARIMA is the river roster's yearly winner: expanding window folds (fit on the months before each year, forecast that year) give " +
+        Y.sarima.folds.map(f => f.year + " MAE $" + fmt(f.mae) + " over " + f.n_months + " months").join("; ") +
+        "; overall MAE $" + fmt(Y.sarima.loyo_mae) + "/MWh. With only " + Y.years.length + " years of monthly data it is a comparison line, not the headline outlook."
+        : (Y.sarima && Y.sarima.error ? " A SARIMA comparison line could not be fit on this region's monthly series (" + Y.sarima.error + ")." : ""));
   }
 
   /* ---------- tiny orbit 3D engine (canvas 2D, painter's algorithm) ------ */
@@ -584,7 +616,7 @@
     const chosenSummary = obj => {
       const c = {};
       Object.values(obj || {}).forEach(v => { if (v) c[v] = (c[v] || 0) + 1; });
-      return Object.entries(c).map(([k, v]) => k + " ×" + v).join(", ") || "—";
+      return Object.entries(c).map(([k, v]) => mname(k) + " ×" + v).join(", ") || "—";
     };
     const rows = [
       ["Last retrain (build run)", BM.generated_at + " UTC"],
@@ -594,7 +626,7 @@
       ["Daily models selected", chosenSummary(MR.daily_chosen)],
       ["Weekly models selected", chosenSummary(MR.weekly_chosen) + " · holdout from " + MR.weekly_holdout_start],
       ["Monthly models selected", chosenSummary(MR.monthly_chosen) + " · holdout from " + MR.monthly_holdout_start],
-      ["Yearly outlook basis", "monthly climatology over " + MR.yearly_years.join(", ")],
+      ["Yearly outlook basis", "monthly climatology over " + MR.yearly_years.join(", ") + " + SARIMA comparison line"],
       ["Market regimes", "k = " + MR.regimes_k + " day clusters"],
       ["Drift status", MR.drift_status + " — largest shift: " + MR.drift_max_feature + " at " + fmt(MR.drift_max_shift) + " train std"],
     ];
