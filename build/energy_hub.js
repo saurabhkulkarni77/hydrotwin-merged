@@ -13,13 +13,17 @@
       <div class="hts-cd">${r.hub}</div>
       <div class="hts-cv" style="font-size:19px">$${fmt(r.latest.last_price)} <span style="font-size:12px;color:#9FB3C8">latest, ${r.latest.last_price_date}</span></div>
       <div class="hts-cd">+1d MAE $${fmt(r.metrics[1].mae)} · skill ${fmt(r.metrics[1].skill_pct, 1)}% · mean skill +1..+7d ${fmt(mean, 1)}%</div>
-      <div style="margin-top:8px"><a class="hts-navbtn" href="${r.id}.html">Open region →</a></div>
+      <div style="margin-top:8px"><a class="hts-navbtn" href="${r.id}.html">Open region →</a> <a class="hts-navbtn" href="${r.id}-3d.html">3D terrain</a></div>
     </div>`;
   }).join("");
   $("hub-pool").innerHTML =
     "<tr><th>Region</th><th>+1d MAE $</th><th>+1d RMSE $</th><th>+1d skill</th><th>+7d MAE $</th><th>+7d skill</th><th>Holdout origins</th><th>Holdout from</th></tr>" +
     D.regions.map(r => `<tr><td>${r.name}</td><td>${fmt(r.metrics[1].mae)}</td><td>${fmt(r.metrics[1].rmse)}</td><td>${fmt(r.metrics[1].skill_pct, 1)}%</td><td>${fmt(r.metrics[7].mae)}</td><td>${fmt(r.metrics[7].skill_pct, 1)}%</td><td>${r.holdout_origins}</td><td>${r.holdout_start}</td></tr>`).join("");
   $("hub-note").textContent = D.meta.note;
+  D.regions.forEach(r => {
+    const el = $("t3-price-" + r.id);
+    if (el) el.textContent = "Latest $" + fmt(r.latest.last_price) + " · " + r.latest.last_price_date + " · " + r.hub;
+  });
 
   /* ---------- MLOps: last build retrain (from build_meta) ---------- */
   const BM = X.build_meta;

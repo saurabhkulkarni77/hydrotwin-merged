@@ -141,6 +141,11 @@ def region_page(rid):
 
   <section class="hts-cards" id="rg-cards" aria-label="Region statistics"></section>
 
+  <section class="hts-sec" id="sec-terrain">
+    <h2>3D terrain — this hub in photorealistic 3D</h2>
+    <p class="hts-note">The same Google Photorealistic 3D Tiles terrain the river 3D pages use (Three.js + the NASA AMMOS tile renderer, Cesium ion), seated at this hub's real geography: {HUB_GEO[rid]["place"]} · {HUB_GEO[rid]["lat"]:.4f}° N, {abs(HUB_GEO[rid]["lon"]):.4f}° W — with a gold pin on the hub and this region's live price summary, and Enter VR on a headset. <a href="{rid}-3d.html" style="color:#8FC1F2">Open the 3D terrain scene →</a></p>
+  </section>
+
   <section class="hts-sec" id="sec-history">
     <h2>Price history</h2>
     <div class="hts-ctl"><button id="btn-hist-1y">Last 365 days</button><button id="btn-hist-all">Full record</button></div>
@@ -345,6 +350,34 @@ HUB = f"""<!doctype html>
 
   <section class="hts-cards" id="hub-cards" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"></section>
 
+  <section class="hts-sec" id="sec-terrain">
+    <h2>3D terrain — photorealistic scene at each hub</h2>
+    <p class="hts-note">The energy twin uses the same 3D terrain as the river twin: Google Photorealistic 3D Tiles streamed through the NASA AMMOS tile renderer (Three.js, Cesium ion asset 2275207), seated at each hub's real geography with a gold pin on the hub and the region's live price summary. Drag to orbit, scroll to zoom; on a VR headset the scene pages offer Enter VR, like the river 3D pages.</p>
+    <div class="hts-cards" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:10px">
+      <div class="hts-card" style="padding:16px">
+        <div class="hts-cl">3D terrain</div>
+        <div style="font-size:17px;font-weight:700;margin:4px 0">Palo Verde</div>
+        <div class="hts-cd">Palo Verde Nuclear Generating Station, Wintersburg, Arizona · 33.3886° N, 112.8617° W</div>
+        <div class="hts-cd" id="t3-price-palo"></div>
+        <div style="margin-top:8px"><a class="hts-navbtn" href="palo-3d.html">Open 3D terrain →</a></div>
+      </div>
+      <div class="hts-card" style="padding:16px">
+        <div class="hts-cl">3D terrain</div>
+        <div style="font-size:17px;font-weight:700;margin:4px 0">CAISO NP15</div>
+        <div class="hts-cd">Sacramento, California — NP15 is a virtual hub, so the scene sits at Sacramento, the region's load centre · 38.5816° N, 121.4944° W</div>
+        <div class="hts-cd" id="t3-price-np15"></div>
+        <div style="margin-top:8px"><a class="hts-navbtn" href="np15-3d.html">Open 3D terrain →</a></div>
+      </div>
+      <div class="hts-card" style="padding:16px">
+        <div class="hts-cl">3D terrain</div>
+        <div style="font-size:17px;font-weight:700;margin:4px 0">Mid-Columbia</div>
+        <div class="hts-cd">The Dalles, Oregon — Columbia River, at the Mid-Columbia dam reach · 45.5946° N, 121.1787° W</div>
+        <div class="hts-cd" id="t3-price-midc"></div>
+        <div style="margin-top:8px"><a class="hts-navbtn" href="midc-3d.html">Open 3D terrain →</a></div>
+      </div>
+    </div>
+  </section>
+
   <section class="hts-sec">
     <h2>Pooled leaderboard — all 3 energy regions</h2>
     <table class="hts-tbl" id="hub-pool"></table>
@@ -389,6 +422,11 @@ SCENE_PAGE = r"""<!doctype html>
  #credits{position:fixed;right:10px;bottom:8px;z-index:10;font-size:11px;color:#9FB3C8;background:rgba(7,25,32,.85);padding:4px 9px;border-radius:6px;max-width:60vw}
  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
  .nav a{background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:8px;padding:6px 10px;font-size:12.5px;text-decoration:none}
+ .nav button{background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;font-family:Arial,sans-serif}
+ .nav button:hover{background:#2E5A8A}
+ .nav .swlab{font-size:12.5px;color:#9FB3C8;align-self:center}
+ #vrbtn{position:fixed;right:14px;bottom:36px;z-index:11;background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Arial,sans-serif;display:none}
+ #vrbtn:hover{background:#2E5A8A}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"},"scopes":{"../vendor3d/":{"three":"../vendor3d/three.module.min.js"}}}</script>
 </head>
@@ -408,8 +446,11 @@ SCENE_PAGE = r"""<!doctype html>
     <a href="__RID__.html">← Region page</a>
     <a href="index.html">Energy regions</a>
     <a href="../index.html">River map</a>
+    <span class="swlab">3D terrain:</span>
+    __SWITCH__
   </div>
 </div>
+<button id="vrbtn" type="button">Enter VR</button>
 <div class="card" id="tstat">Loading 3D tiles…</div>
 <div id="credits">Basemap: Google Maps · 3D tiles access: Cesium ion · Prices: HydroTwin Energy</div>
 <script src="data.js"></script>
@@ -439,6 +480,7 @@ SCENE_PAGE = r"""<!doctype html>
       T3.Material.prototype.onBuild = function () {};
     const canvas = document.getElementById("scene");
     const renderer = new T3.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.xr.enabled = true;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const scene = new T3.Scene();
     scene.background = new T3.Color(0x0b1622);
@@ -480,6 +522,14 @@ SCENE_PAGE = r"""<!doctype html>
     tiles.group.matrix.set(...localFrame(LAT, LON));
     tiles.group.updateWorldMatrix(true, false);
     scene.add(tiles.group);
+    // WebXR, as on the river 3D pages: the camera rides in a rig so the
+    // headset pose is relative to the scene. On desktop the rig sits at
+    // the origin, so the orbit controls below drive the camera exactly
+    // as before; in a headset the visitor stands at the hub (see the
+    // session handlers further down).
+    const rig = new T3.Group();
+    scene.add(rig);
+    rig.add(camera);
     // hub marker (basic materials: the tile scene is unlit)
     const gold = new T3.MeshBasicMaterial({ color: 0xffd24d });
     const pole = new T3.Mesh(new T3.CylinderGeometry(2.5, 2.5, 150, 10), gold);
@@ -532,9 +582,41 @@ SCENE_PAGE = r"""<!doctype html>
     }
     window.addEventListener("resize", resize);
     resize(); placeCam();
+    // Enter VR: the button appears only when an immersive-vr session is
+    // available. On session start the camera drops to eye height near
+    // the hub pin; the desktop orbit position is restored on exit.
+    const vrbtn = document.getElementById("vrbtn");
+    let savedCamPos = null;
+    renderer.xr.addEventListener("sessionstart", () => {
+      savedCamPos = camera.position.clone();
+      camera.position.set(0, 1.7, 55);
+    });
+    renderer.xr.addEventListener("sessionend", () => {
+      if (savedCamPos) camera.position.copy(savedCamPos);
+      placeCam();
+    });
+    if (navigator.xr && navigator.xr.isSessionSupported) {
+      navigator.xr.isSessionSupported("immersive-vr").then(ok => {
+        if (!ok) return;
+        vrbtn.style.display = "block";
+        vrbtn.addEventListener("click", async () => {
+          try {
+            const cur = renderer.xr.getSession();
+            if (cur) { cur.end(); return; }
+            const session = await navigator.xr.requestSession("immersive-vr",
+              { optionalFeatures: ["local-floor", "bounded-floor"] });
+            session.addEventListener("end", () => { vrbtn.textContent = "Enter VR"; });
+            await renderer.xr.setSession(session);
+            vrbtn.textContent = "Exit VR";
+          } catch (e) {
+            stat.textContent = "VR session failed: " +
+              String(e && e.message || e).slice(0, 160);
+          }
+        });
+      }).catch(() => {});
+    }
     window.__htEnergyTiles = { models: () => models, errors: () => errors };
-    (function tick() {
-      requestAnimationFrame(tick);
+    renderer.setAnimationLoop(function tick() {
       try {
         tiles.setCamera(camera);
         renderer.getDrawingBufferSize(resV);
@@ -544,7 +626,7 @@ SCENE_PAGE = r"""<!doctype html>
       } catch (err) {
         stat.textContent = "3D tiles failed: " + String(err && err.message || err).slice(0, 200);
       }
-    })();
+    });
   } catch (err) {
     stat.textContent = "3D tiles failed to load: " +
       String(err && err.message || err).slice(0, 200) +
@@ -570,6 +652,12 @@ def scene_page(rid, token):
     s = s.replace("__ELEVV__", repr(g["elev"]))
     s = s.replace("__GEOIDV__", repr(g["geoid"]))
     s = s.replace("__RID__", rid)
+    switch = "".join(
+        f'<button type="button" disabled style="background:#2E9B57;border-color:#7AE07A;cursor:default">{n} · this scene</button>'
+        if o == rid else
+        f'<a href="{o}-3d.html">{n} 3D terrain</a>'
+        for o, n in REGIONS)
+    s = s.replace("__SWITCH__", switch)
     return s
 
 
