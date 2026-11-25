@@ -641,8 +641,8 @@
       ctx.fillText("standardized ridge coefficients, +" + h + "d · tallest |coef| " + fmt(mx, 3), a[0] - 6, a[1]);
     }
   });
-  document.querySelectorAll(".hte3-mode").forEach(b => b.addEventListener("click", () => {
-    document.querySelectorAll(".hte3-mode").forEach(x => x.classList.toggle("hte3-on", x === b));
+  document.querySelectorAll(".htc3-mode").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".htc3-mode").forEach(x => x.classList.toggle("htc3-on", x === b));
     mode3d = b.dataset.mode; c3.render();
   }));
 

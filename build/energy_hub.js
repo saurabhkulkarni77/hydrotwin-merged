@@ -7,11 +7,12 @@
   const fmt = (n, d) => (n === null || n === undefined || isNaN(n)) ? "—" : Number(n).toFixed(d === undefined ? 2 : d);
   $("hub-cards").innerHTML = D.regions.map(r => {
     const mean = [1, 2, 3, 4, 5, 6, 7].reduce((a, h) => a + r.metrics[h].skill_pct, 0) / 7;
-    return `<div class="hts-card" style="padding:16px">
+    return `<div class="hts-card">
       <div class="hts-cl">Energy region</div>
-      <div style="font-size:17px;font-weight:700;margin:4px 0"><a href="${r.id}.html" style="color:#F5F6F2;text-decoration:none">${r.name}</a></div>
+      <div class="hts-cv">${r.name}</div>
       <div class="hts-cd">${r.hub}</div>
-      <div class="hts-cv" style="font-size:19px">$${fmt(r.latest.last_price)} <span style="font-size:12px;color:#9FB3C8">latest, ${r.latest.last_price_date}</span></div>
+      <div class="hts-cv">$${fmt(r.latest.last_price)}</div>
+      <div class="hts-cd">latest, ${r.latest.last_price_date}</div>
       <div class="hts-cd">+1d MAE $${fmt(r.metrics[1].mae)} · skill ${fmt(r.metrics[1].skill_pct, 1)}% · mean skill +1..+7d ${fmt(mean, 1)}%</div>
       <div style="margin-top:8px"><a class="hts-navbtn" href="${r.id}.html">Open region →</a> <a class="hts-navbtn" href="${r.id}-3d.html">3D terrain</a></div>
     </div>`;

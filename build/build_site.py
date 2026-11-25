@@ -61,22 +61,38 @@ def _statsview_css():
     assert m, "ht-statsview CSS block not found in river station page"
     return m.group(1)
 
+
+def _river_css_block(marker, src="stations/USGS-01463500.html"):
+    """One <style> block of a river page, verbatim, found by a marker string.
+    The energy pages reuse the river twin's own panel/button CSS blocks
+    (lazypanels bar, htc3 data-chart chrome, clusters legend, 3D scene
+    chrome) extracted from the river pages at build time, exactly like the
+    ht-statsview block above — never retyped here."""
+    page = (RIVER / src).read_text()
+    for m in re.finditer(r"<style>(.*?)</style>", page, re.S):
+        if marker in m.group(1):
+            return m.group(1)
+    raise AssertionError(f"river CSS block {marker!r} not found in {src}")
+
+
 CSS = _statsview_css()
-EXTRA_CSS = """
-.hts-sparks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.hts-spark{background:#101E30;border:1px solid #22344C;border-radius:12px;padding:10px 12px}
-.hts-spark h4{margin:0 0 6px;font-size:12.5px;color:#8FC1F2;text-transform:uppercase;letter-spacing:.04em}
-.hts-spark canvas{width:100%;height:auto;display:block}
+# River-verbatim blocks: the panel toggle bar (ht-lazypanels), the 3D data
+# charts chrome (#htc3-root), the same chrome re-scoped to the forecast
+# surface panel's root (#htsfc-root — identical declarations, second scope
+# because a page cannot repeat an id), and the clusters panel (#htclusters-root).
+HTC3_CSS = _river_css_block("#htc3-root .htc3-ctl")
+EXTRA_CSS = (
+    _river_css_block("/* ht-lazypanels v1 */")
+    + HTC3_CSS
+    + HTC3_CSS.replace("#htc3-root", "#htsfc-root")
+    + _river_css_block("#htclusters-root .htclusters-h")
+    + """
 a.hts-navbtn.on{background:#23466E}
-.hte3-ctl{display:flex;gap:8px;margin:4px 0 10px;flex-wrap:wrap}
-.hte3-mode{background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:8px;padding:7px 12px;font:600 13px Arial;cursor:pointer}
-.hte3-mode.hte3-on{background:#2E9B57;border-color:#7AE07A}
-.hte3-view{position:relative}
-.hte3-canvas{display:block;width:100%;height:440px;border-radius:10px;background:#0E1A24;cursor:grab;touch-action:none}
-.hte3-tip{position:absolute;display:none;background:rgba(11,19,29,.94);color:#E6EDF5;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:5px 9px;font:12.5px Arial;pointer-events:none;max-width:300px}
-.hte3-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px;font-size:11.5px;color:#9FB3C8}
-.hte3-legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
-"""
+""")
+# River 3D scene chrome (hud / links / status / attr), verbatim from the
+# river station 3D page's first style block.
+SCENE_CSS = _river_css_block("height:100%;overflow:hidden",
+                             src="stations/USGS-01463500-3d.html")
 
 # Real hub geography for the 3D scene pages. elev/geoid are approximate site
 # values used ONLY to seat the tile scene at local ground level (the same
@@ -141,19 +157,19 @@ def region_page(rid):
 
   <section class="hts-cards" id="rg-cards" aria-label="Region statistics"></section>
 
-  <section class="hts-sec" id="sec-terrain">
+  <section class="hts-sec htlp-off" id="hts-sec-terrain">
     <h2>3D terrain — this hub in photorealistic 3D</h2>
     <p class="hts-note">The same Google Photorealistic 3D Tiles terrain the river 3D pages use (Three.js + the NASA AMMOS tile renderer, Cesium ion), seated at this hub's real geography: {HUB_GEO[rid]["place"]} · {HUB_GEO[rid]["lat"]:.4f}° N, {abs(HUB_GEO[rid]["lon"]):.4f}° W — with a gold pin on the hub and this region's live price summary, and Enter VR on a headset. <a href="{rid}-3d.html" style="color:#8FC1F2">Open the 3D terrain scene →</a></p>
   </section>
 
-  <section class="hts-sec" id="sec-history">
+  <section class="hts-sec htlp-off" id="hts-sec-hydro">
     <h2>Price history</h2>
     <div class="hts-ctl"><button id="btn-hist-1y">Last 365 days</button><button id="btn-hist-all">Full record</button></div>
     <canvas id="cv-history" class="hts-cv" width="1320" height="250"></canvas>
     <p class="hts-note">Daily day-ahead price for this hub over the full record held by the energy twin. The shaded span is the time based holdout: origins the shipped metrics were scored on, never used in training.</p>
   </section>
 
-  <section class="hts-sec" id="sec-moving">
+  <section class="hts-sec htlp-off" id="hts-sec-moving">
     <h2>Moving forecast — holdout walk-forward</h2>
     <div class="hts-ctl">
       <button id="mv-play">▶ Play</button><button id="mv-prev">◀ Step</button><button id="mv-next">Step ▶</button>
@@ -164,14 +180,14 @@ def region_page(rid):
     <p class="hts-note">Blue: observed prices up to the forecast origin. Green: the model forecast issued at that origin (the model selected per horizon on validation, refit on the training period only). Gold: what actually happened next. Red dashed: persistence (price stays at the last observed value). Shaded band: ±1.2816 × holdout residual σ. Every forecast here was recomputed by the energy pipeline's own training code on its cached raw data for this merged build, and the resulting holdout metrics reproduce the shipped HydroTwin Energy metrics exactly.</p>
   </section>
 
-  <section class="hts-sec" id="sec-fc">
+  <section class="hts-sec htlp-off" id="hts-sec-fc">
     <h2>7-day forecast</h2>
     <canvas id="cv-outlook" class="hts-cv" width="1320" height="240"></canvas>
     <table class="hts-tbl" id="fc-tbl" style="margin-top:10px"></table>
     <p class="hts-note">The latest forecast issued by the energy twin, with its ±1.2816σ band. This is a static snapshot (see the snapshot date above), not a live feed — the same status the standalone HydroTwin Energy site carries.</p>
   </section>
 
-  <section class="hts-sec" id="sec-models">
+  <section class="hts-sec htlp-off" id="hts-sec-models">
     <h2>Model statistics</h2>
     <table class="hts-tbl" id="ms-tbl"></table>
     <h3>MAE by forecast lead — this region</h3>
@@ -181,19 +197,19 @@ def region_page(rid):
     <p class="hts-note">Honest headline: skill against persistence is small (a few percent on MAE for the best models) and is negative at some horizons and for some models. The tables show every horizon and every model, good and bad.</p>
   </section>
 
-  <section class="hts-sec" id="sec-compare">
+  <section class="hts-sec htlp-off" id="hts-sec-compare">
     <h2>Model compare — the full shared roster</h2>
     <table class="hts-tbl" id="cmp-tbl"></table>
     <p class="hts-note">This twin runs the SAME model roster as the HydroTwin river twin, so the two are directly comparable: ridge, MLP, Random Forest and MiniRocket, plus the paper roster — LSTM, physics informed LSTM, Transformer, Temporal Fusion Transformer, PatchTST, two Gaussian process models, a graph convolutional network, ARIMA and seasonal ARIMA. Per horizon, every model is fit on the training period and compared on a validation slice (the last 20 percent of training); the winner is refit on the full training period and scored once on the holdout, and the table shows every model's holdout MAE with the selected model in bold. Two adaptations are energy specific and stated plainly: the physics informed LSTM's penalty pulls predictions toward an equilibrium price implied by the exogenous drivers (gas price, temperature, hydro flow) fit on training data only — a driver equilibrium penalty, not river physics; and the graph convolutional network's nodes are the three price regions, linked by the similarity of their training period price and feature regimes, the energy analogue of the river net's snow regime links. Models predict the signed log price change from the last observed price, so persistence is the anchor they must beat; predictions are clipped to the training period's observed price range (maximum extended 25 percent).</p>
   </section>
 
-  <section class="hts-sec" id="sec-ablation">
+  <section class="hts-sec htlp-off" id="hts-sec-ablation">
     <h2>Feature ablation</h2>
     <table class="hts-tbl" id="ab-tbl"></table>
     <p class="hts-note">Ridge model refit on the training origins with one feature group removed at a time, scored on the same holdout. A positive Δ means the group was helping. Computed for this merged build by the energy pipeline's own feature code.</p>
   </section>
 
-  <section class="hts-sec" id="sec-costs">
+  <section class="hts-sec htlp-off" id="hts-sec-costs">
     <h2>Generation cost anchors</h2>
     <p class="hts-note">Where this hub's prices sit against what it costs to generate. The gold band is this hub's own observed price distribution over the full record (10th to 90th percentile, tick at the median, diamond at the mean); the blue bands are levelized cost of energy ranges by technology from the project's power plant cost workbook (Lazard LCOE+, July 2026, unsubsidized). A hub whose prices usually clear below a technology's LCOE band is not paying that technology's full cost of new entry — it is paying the marginal cost of whatever plant is on the margin, which for gas is drawn below.</p>
     <canvas id="cv-bands" class="hts-cv" width="1320" height="250"></canvas>
@@ -206,7 +222,7 @@ def region_page(rid):
     <p class="hts-note" id="ca-note"></p>
   </section>
 
-  <section class="hts-sec" id="sec-weekly">
+  <section class="hts-sec htlp-off" id="hts-sec-weekly">
     <h2>Weekly outlook</h2>
     <canvas id="cv-weekly" class="hts-cv" width="1320" height="250"></canvas>
     <table class="hts-tbl" id="wk-tbl" style="margin-top:10px"></table>
@@ -215,7 +231,7 @@ def region_page(rid):
     <p class="hts-note">Weekly mean price models trained for this merged build on the region's real daily series, aggregated to weeks (weeks ending Sunday, at least 3 priced days each). Per horizon, four candidates compete on a validation slice: a ridge on lagged weekly means, gas, flow and calendar features, a week of year climatology, a small Transformer over weekly feature windows, and a seasonal ARIMA (weekly period 52) rolled forward operationally; the winner is refit on the training weeks and scored once on the holdout (<span id="wk-ho"></span>). The issued outlook refits the winner on all weeks. Same protocol as the daily models, one scale up — the river twin's weekly outlook slot, with energy models genuinely trained at the weekly scale.</p>
   </section>
 
-  <section class="hts-sec" id="sec-monthly">
+  <section class="hts-sec htlp-off" id="hts-sec-monthly">
     <h2>Monthly outlook</h2>
     <canvas id="cv-monthly" class="hts-cv" width="1320" height="250"></canvas>
     <table class="hts-tbl" id="mo-tbl" style="margin-top:10px"></table>
@@ -224,91 +240,95 @@ def region_page(rid):
     <p class="hts-note">Monthly mean price models (months with at least 15 priced days), trained the same way as the weekly models: ridge on lagged monthly means, gas and calendar features against a calendar month climatology, a small Transformer and a seasonal ARIMA (monthly period 12), winner by validation, scored once on the holdout (<span id="mo-ho"></span>). Read the n column before trusting a line: with only a few years of history the monthly holdout holds a handful of origins, so these scores are indicative, not precise.</p>
   </section>
 
-  <section class="hts-sec" id="sec-yearly">
+  <section class="hts-sec htlp-off" id="hts-sec-yearly">
     <h2>Yearly outlook</h2>
     <canvas id="cv-yearly" class="hts-cv" width="1320" height="250"></canvas>
     <table class="hts-tbl" id="yr-tbl" style="margin-top:10px"></table>
     <p class="hts-note" id="yr-note"></p>
   </section>
 
-  <section class="hts-sec" id="sec-drift">
+  <section class="hts-sec htlp-off" id="hts-sec-drift">
     <h2>Drift</h2>
     <table class="hts-tbl" id="dr-tbl"></table>
     <p class="hts-note">Feature means on training origins versus holdout origins, with the shift expressed in training standard deviations. Large shifts mark regime change between the period the models learned and the period they were scored on.</p>
   </section>
 
-  <section class="hts-sec" id="sec-band">
+  <section class="hts-sec htlp-off" id="hts-sec-band">
     <h2>Confidence band</h2>
     <table class="hts-tbl" id="band-tbl"></table>
     <p class="hts-note">The energy twin's interval method: a constant ±1.2816 × per horizon holdout residual σ around each forecast (about 80 percent if residuals were normal). This is the energy equivalent of the river pages' DACP confidence panels — the river twin fits distribution adjusted intervals per station, while the energy models ship residual σ bands, so the band shown here is the energy project's own published method rather than a refit of the river one.</p>
   </section>
 
-  <section class="hts-sec" id="sec-surface">
+  <section class="hts-sec htlp-off" id="hts-sec-3dchart">
     <h2>Forecast surface in 3D</h2>
-    <div class="hte3-view">
-      <canvas id="cv-surface" class="hte3-canvas" aria-label="Interactive 3D surface: mean holdout forecast price by origin month and forecast horizon. Drag to orbit, scroll to zoom, hover for exact values"></canvas>
-      <div class="hte3-tip" id="tip-surface"></div>
-    </div>
+    <div id="htsfc-root"><div class="htc3-view">
+      <canvas id="cv-surface" class="htc3-canvas" aria-label="Interactive 3D surface: mean holdout forecast price by origin month and forecast horizon. Drag to orbit, scroll to zoom, hover for exact values"></canvas>
+      <div class="htc3-tip" id="tip-surface"></div>
+    </div></div>
     <p class="hts-note">Mean holdout forecast price by origin calendar month (x) and forecast horizon +1 to +7 days (z), computed from this region's genuine walk-forward backtest — every cell averages the actual forecasts the models issued from origins in that month. Months with no holdout origins stay empty: the holdout covers only part of the year (see the moving forecast panel), so this surface describes the holdout months, not a full year of seasons. Drag to orbit, scroll to zoom, hover a cell for its values. This is the energy counterpart of the river pages' 3D forecast chart.</p>
   </section>
 
-  <section class="hts-sec" id="sec-corr">
+  <section class="hts-sec htlp-off" id="hts-sec-corr">
     <h2>Multi-factor correlation</h2>
     <canvas id="cv-corr" class="hts-cv" width="1320" height="300"></canvas>
     <p class="hts-note">Pearson correlation of each input feature with the next day signed log price change, over all forecast origins. Correlation is not causation — it shows which signals move with tomorrow's price change in this record.</p>
   </section>
 
-  <section class="hts-sec" id="sec-featimp">
+  <section class="hts-sec htlp-off" id="hts-sec-featimp">
     <h2>Features affecting price</h2>
     <div class="hts-ctl"><label>Horizon <select id="fi-h"><option selected>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select> days</label></div>
     <canvas id="cv-featimp" class="hts-cv" width="1320" height="300"></canvas>
     <p class="hts-note">Standardized ridge coefficients for the selected horizon (features are standardized before fitting, so coefficient size is comparable). Green pushes the price change up, red pushes it down. Shown for the ridge model, whose coefficients are directly readable; every roster model is compared in the model compare table instead.</p>
   </section>
 
-  <section class="hts-sec" id="sec-charts3d">
+  <section class="hts-sec" id="hts-sec-charts3d">
     <h2>Data charts in 3D</h2>
     <p class="hts-note">The two charts above, rendered in 3D from exactly the same data: the price history is the last 365 days of this region's price record, and the bars are the ridge feature importances from the same data as the 2D chart (horizon follows the selector in the features panel). Drag to orbit, scroll to zoom, hover a point or a bar to read its exact values. The photorealistic terrain scene for this hub is on the region's <a href="{rid}-3d.html" style="color:#8FC1F2">3D scene page</a>.</p>
-    <div class="hte3-ctl">
-      <button type="button" class="hte3-mode hte3-on" data-mode="price">Price history 3D</button>
-      <button type="button" class="hte3-mode" data-mode="feat">Feature importance 3D</button>
+    <div id="htc3-root">
+    <div class="htc3-ctl">
+      <button type="button" class="htc3-mode htc3-on" data-mode="price">Price history 3D</button>
+      <button type="button" class="htc3-mode" data-mode="feat">Feature importance 3D</button>
     </div>
-    <div class="hte3-view">
-      <canvas id="cv-3d" class="hte3-canvas" aria-label="Interactive 3D chart: drag to orbit, scroll to zoom, hover for exact values"></canvas>
-      <div class="hte3-tip" id="tip-3d"></div>
+    <div class="htc3-view">
+      <canvas id="cv-3d" class="htc3-canvas" aria-label="Interactive 3D chart: drag to orbit, scroll to zoom, hover for exact values"></canvas>
+      <div class="htc3-tip" id="tip-3d"></div>
+    </div>
     </div>
   </section>
 
-  <section class="hts-sec" id="sec-regimes">
+  <section class="hts-sec htlp-off" id="hts-sec-clusters">
     <h2>Market regimes — day clusters</h2>
+    <div id="htclusters-root">
     <p class="hts-note">The river twin clusters its 14 stations by how their rivers behave; three regions cannot be clustered meaningfully, so this panel clusters DAYS instead. Every forecast origin day is a point in this region's standardized daily feature space (the model features plus 7 day price volatility), grouped by k means with k chosen by silhouette score. Days in one regime share a market character. The table gives each regime's size and price statistics; regime names are assigned by rule from those statistics, not by hand. The scatter shows the days in the first two principal components of the same features, and the timeline shows when each regime occurred.</p>
     <table class="hts-tbl" id="rgm-tbl"></table>
     <h3>Days in feature space (PCA)</h3>
     <canvas id="cv-rgm-pca" class="hts-cv" width="1320" height="300"></canvas>
-    <div class="hte3-legend" id="rgm-legend"></div>
+    <div class="htclusters-legend" id="rgm-legend"></div>
     <h3>Regime timeline</h3>
     <canvas id="cv-rgm-tl" class="hts-cv" width="1320" height="170"></canvas>
     <p class="hts-note" id="rgm-note"></p>
+    </div>
   </section>
 
-  <section class="hts-sec" id="sec-cond">
+  <section class="hts-sec htlp-off" id="hts-sec-cond">
     <h2>Conditions — flow, snow, soil, gas</h2>
-    <div class="hts-sparks">
-      <div class="hts-spark"><h4>River flow (region gauges)</h4><canvas id="sp-flow" width="520" height="64"></canvas></div>
-      <div class="hts-spark"><h4>Snow water equivalent</h4><canvas id="sp-swe" width="520" height="64"></canvas></div>
-      <div class="hts-spark"><h4>Soil moisture</h4><canvas id="sp-soil" width="520" height="64"></canvas></div>
-      <div class="hts-spark"><h4>Henry Hub gas</h4><canvas id="sp-gas" width="520" height="64"></canvas></div>
+    <div class="hts-panels">
+      <div class="hts-card"><div class="hts-cl">River flow (region gauges)</div><canvas id="sp-flow" width="520" height="64" style="width:100%;height:auto;display:block;margin-top:6px"></canvas></div>
+      <div class="hts-card"><div class="hts-cl">Snow water equivalent</div><canvas id="sp-swe" width="520" height="64" style="width:100%;height:auto;display:block;margin-top:6px"></canvas></div>
+      <div class="hts-card"><div class="hts-cl">Soil moisture</div><canvas id="sp-soil" width="520" height="64" style="width:100%;height:auto;display:block;margin-top:6px"></canvas></div>
+      <div class="hts-card"><div class="hts-cl">Henry Hub gas</div><canvas id="sp-gas" width="520" height="64" style="width:100%;height:auto;display:block;margin-top:6px"></canvas></div>
     </div>
     <h3>Feature values at the latest forecast origin</h3>
     <table class="hts-tbl" id="fl-tbl"></table>
   </section>
 
-  <section class="hts-sec" id="sec-mlops">
+  <section class="hts-sec htlp-off" id="hts-sec-mlops">
     <h2>MLOps — retraining status</h2>
     <table class="hts-tbl" id="mlops-tbl"></table>
     <p class="hts-note">The energy models are retrained every time this merged site is built: the build re-runs the energy pipeline's own training code on its cached raw data and regenerates every forecast, backtest and diagnostic on these pages, at the daily, weekly and monthly scales. Every value above is read from that run's own outputs — the retrain timestamp is when this build's training run executed, and the sanity line records whether the retrained daily models reproduced the shipped HydroTwin Energy holdout metrics. This mirrors the river twin's MLOps status presentation (see the <a href="../mlops.html" style="color:#8FC1F2">river MLOps page</a>); the energy side has no separate live feed because its retraining happens inside the build itself.</p>
   </section>
 
-  <section class="hts-sec" id="sec-notebook">
+  <section class="hts-sec htlp-off" id="hts-sec-notebook">
     <h2>Region notebook</h2>
     <h3>Stations and feeds behind this region</h3>
     <ul class="hts-note" id="nb-stations" style="margin:0;padding-left:18px"></ul>
@@ -318,6 +338,35 @@ def region_page(rid):
     <p class="hts-note">Yearly outlook: the river twin fits yearly models on 25 years of flow; this region has only a few years of price history (the yearly panel states the exact span), so the yearly outlook here is a monthly climatology with its year to year spread, checked by leave-one-year-out validation instead of holdout scores — no fitted yearly model is claimed; a seasonal ARIMA line fit on the monthly series is drawn next to it for comparison, with its own expanding window fold scores, because SARIMA is the river roster's yearly winner. 3D scene: the region's 3D page uses the same Google Photorealistic 3D Tiles scene as the river 3D pages, placed at the hub's real geography, but a price hub has no gauge reach, water surface or rating curve, so the scene carries the hub marker and the price panels rather than flow ribbons and flood layers. Clusters: the river panel clusters stations; the energy panel clusters days into market regimes (above), which is the genuine equivalent for three regions.</p>
   </section>
 
+  <!-- ht-lazypanels v1 -->
+  <div id="htlp-bar" role="group" aria-label="Region panels"><span class="htlp-t">PANELS</span><button type="button" class="htlp-btn" aria-pressed="false">3D terrain</button><button type="button" class="htlp-btn" aria-pressed="false">Price history</button><button type="button" class="htlp-btn" aria-pressed="false">Moving forecast</button><button type="button" class="htlp-btn" aria-pressed="false">7-day forecast</button><button type="button" class="htlp-btn" aria-pressed="false">Model statistics</button><button type="button" class="htlp-btn" aria-pressed="false">Model compare</button><button type="button" class="htlp-btn" aria-pressed="false">Feature ablation</button><button type="button" class="htlp-btn" aria-pressed="false">Generation cost anchors</button><button type="button" class="htlp-btn" aria-pressed="false">Weekly outlook</button><button type="button" class="htlp-btn" aria-pressed="false">Monthly outlook</button><button type="button" class="htlp-btn" aria-pressed="false">Yearly outlook</button><button type="button" class="htlp-btn" aria-pressed="false">Drift</button><button type="button" class="htlp-btn" aria-pressed="false">Confidence band</button><button type="button" class="htlp-btn" aria-pressed="false">Forecast surface in 3D</button><button type="button" class="htlp-btn" aria-pressed="false">Multi-factor correlation</button><button type="button" class="htlp-btn" aria-pressed="false">Features affecting price</button><button type="button" class="htlp-btn" aria-pressed="false">Market regimes</button><button type="button" class="htlp-btn" aria-pressed="false">Conditions</button><button type="button" class="htlp-btn" aria-pressed="false">MLOps</button><button type="button" class="htlp-btn" aria-pressed="false">Region notebook</button></div>
+  <script>
+  // ht-lazypanels v1 toggle (energy port of the river loader): the river
+  // loader additionally lazy-boots each panel's own scripts on first open;
+  // the energy panels boot eagerly with energy_region.js, so opening a panel
+  // fires the window resize handler instead (drawAll) to size canvases that
+  // were hidden at load. Toggle semantics otherwise match the river pages.
+  (function () {{
+    var CFG = [{{sec:"hts-sec-terrain"}},{{sec:"hts-sec-hydro"}},{{sec:"hts-sec-moving"}},{{sec:"hts-sec-fc"}},{{sec:"hts-sec-models"}},{{sec:"hts-sec-compare"}},{{sec:"hts-sec-ablation"}},{{sec:"hts-sec-costs"}},{{sec:"hts-sec-weekly"}},{{sec:"hts-sec-monthly"}},{{sec:"hts-sec-yearly"}},{{sec:"hts-sec-drift"}},{{sec:"hts-sec-band"}},{{sec:"hts-sec-3dchart"}},{{sec:"hts-sec-corr"}},{{sec:"hts-sec-featimp"}},{{sec:"hts-sec-clusters"}},{{sec:"hts-sec-cond"}},{{sec:"hts-sec-mlops"}},{{sec:"hts-sec-notebook"}}];
+    CFG.forEach(function (cfg, i) {{
+      var btn = document.querySelectorAll('.htlp-btn')[i];
+      var el = document.getElementById(cfg.sec);
+      if (!btn || !el) return;
+      btn.addEventListener('click', function () {{
+        var opening = el.classList.contains('htlp-off');
+        if (opening) {{
+          el.classList.remove('htlp-off');
+          btn.classList.add('htlp-on'); btn.setAttribute('aria-pressed', 'true');
+          window.dispatchEvent(new Event('resize'));
+          el.scrollIntoView({{ block: 'start' }});
+        }} else {{
+          el.classList.add('htlp-off');
+          btn.classList.remove('htlp-on'); btn.setAttribute('aria-pressed', 'false');
+        }}
+      }});
+    }});
+  }})();
+  </script>
   <p class="hts-note" style="margin-top:14px">Merged twin: river pages and energy pages share one index. River data: USGS daily flow and weather, Oct 2001 to Sep 2026. Energy data: ICE day-ahead indices republished by EIA, CAISO OASIS, EIA Henry Hub, USGS, NRCS SNOTEL and SCAN, Open-Meteo.</p>
 </div>
 <script src="data.js"></script>
@@ -348,29 +397,29 @@ HUB = f"""<!doctype html>
     </nav>
   </header>
 
-  <section class="hts-cards" id="hub-cards" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"></section>
+  <section class="hts-cards" id="hub-cards"></section>
 
   <section class="hts-sec" id="sec-terrain">
     <h2>3D terrain — photorealistic scene at each hub</h2>
     <p class="hts-note">The energy twin uses the same 3D terrain as the river twin: Google Photorealistic 3D Tiles streamed through the NASA AMMOS tile renderer (Three.js, Cesium ion asset 2275207), seated at each hub's real geography with a gold pin on the hub and the region's live price summary. Drag to orbit, scroll to zoom; on a VR headset the scene pages offer Enter VR, like the river 3D pages.</p>
-    <div class="hts-cards" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:10px">
-      <div class="hts-card" style="padding:16px">
+    <div class="hts-cards">
+      <div class="hts-card">
         <div class="hts-cl">3D terrain</div>
-        <div style="font-size:17px;font-weight:700;margin:4px 0">Palo Verde</div>
+        <div class="hts-cv">Palo Verde</div>
         <div class="hts-cd">Palo Verde Nuclear Generating Station, Wintersburg, Arizona · 33.3886° N, 112.8617° W</div>
         <div class="hts-cd" id="t3-price-palo"></div>
         <div style="margin-top:8px"><a class="hts-navbtn" href="palo-3d.html">Open 3D terrain →</a></div>
       </div>
-      <div class="hts-card" style="padding:16px">
+      <div class="hts-card">
         <div class="hts-cl">3D terrain</div>
-        <div style="font-size:17px;font-weight:700;margin:4px 0">CAISO NP15</div>
+        <div class="hts-cv">CAISO NP15</div>
         <div class="hts-cd">Sacramento, California — NP15 is a virtual hub, so the scene sits at Sacramento, the region's load centre · 38.5816° N, 121.4944° W</div>
         <div class="hts-cd" id="t3-price-np15"></div>
         <div style="margin-top:8px"><a class="hts-navbtn" href="np15-3d.html">Open 3D terrain →</a></div>
       </div>
-      <div class="hts-card" style="padding:16px">
+      <div class="hts-card">
         <div class="hts-cl">3D terrain</div>
-        <div style="font-size:17px;font-weight:700;margin:4px 0">Mid-Columbia</div>
+        <div class="hts-cv">Mid-Columbia</div>
         <div class="hts-cd">The Dalles, Oregon — Columbia River, at the Mid-Columbia dam reach · 45.5946° N, 121.1787° W</div>
         <div class="hts-cd" id="t3-price-midc"></div>
         <div style="margin-top:8px"><a class="hts-navbtn" href="midc-3d.html">Open 3D terrain →</a></div>
@@ -407,67 +456,59 @@ SCENE_PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HydroTwin 3D · __NAME__</title>
-<style>
- html,body{margin:0;height:100%;background:#0B1622;color:#E6EDF5;font-family:Arial,sans-serif;overflow:hidden}
+<style>__SCENE_CSS__
  #scene{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
- .card{position:fixed;z-index:10;background:rgba(10,20,34,.9);border:1px solid #22344C;border-radius:12px;padding:12px 14px;max-width:360px}
- #info{left:14px;top:14px}
- #info h1{font-size:17px;margin:0 0 2px}
- #info .place{color:#8FC1F2;font-size:12.5px;margin-bottom:6px}
- #info p{font-size:12.5px;line-height:1.5;color:#C7D5E6;margin:6px 0}
- #info a{color:#8FC1F2}
- .row{display:flex;justify-content:space-between;gap:14px;font-size:12.5px;margin:3px 0}
- .row b{color:#FFD24D;font-weight:600}
- #tstat{left:14px;bottom:14px;font-size:12px;color:#9FB3C8}
- #credits{position:fixed;right:10px;bottom:8px;z-index:10;font-size:11px;color:#9FB3C8;background:rgba(7,25,32,.85);padding:4px 9px;border-radius:6px;max-width:60vw}
- .nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
- .nav a{background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:8px;padding:6px 10px;font-size:12.5px;text-decoration:none}
- .nav button{background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;font-family:Arial,sans-serif}
- .nav button:hover{background:#2E5A8A}
- .nav .swlab{font-size:12.5px;color:#9FB3C8;align-self:center}
- #vrbtn{position:fixed;right:14px;bottom:36px;z-index:11;background:#23466E;color:#F5F6F2;border:1px solid #2E5A8A;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Arial,sans-serif;display:none}
- #vrbtn:hover{background:#2E5A8A}
+ #vrbtn{position:absolute;bottom:20px;left:calc(50% - 60px);width:120px;padding:12px 6px;border:1px solid #fff;border-radius:4px;background:rgba(0,0,0,.1);color:#fff;font:normal 13px sans-serif;text-align:center;opacity:.5;outline:none;z-index:999;cursor:pointer;display:none}
+ #vrbtn:hover{opacity:1}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"},"scopes":{"../vendor3d/":{"three":"../vendor3d/three.module.min.js"}}}</script>
 </head>
 <body>
 <canvas id="scene" aria-label="Photorealistic 3D scene at the hub. Drag to orbit, scroll to zoom."></canvas>
-<div class="card" id="info">
-  <h1 id="rg-name">__NAME__</h1>
-  <div class="place">__PLACE__ · __LAT__, __LON__</div>
-  <p>__NOTE__</p>
-  <p>The gold pin marks the hub location in the same Google Photorealistic 3D Tiles
+<div id="hud"><span class="tg" id="hud-tg" title="Collapse / expand">–</span>
+  <div class="t" id="rg-name">__NAME__</div>
+  <div class="more">
+    <div>__PLACE__ · __LAT__, __LON__</div>
+    <div>__NOTE__</div>
+    <div>The gold pin marks the hub location in the same Google Photorealistic 3D Tiles
   scene the river 3D pages use. A price hub has no gauge reach, water surface or
   rating curve, so this scene carries the hub marker and the live price summary —
   the forecasts, ribbons and flood layers stay on the river pages, and every
-  energy panel is on the region page.</p>
-  <div id="live"></div>
-  <div class="nav">
-    <a href="__RID__.html">← Region page</a>
-    <a href="index.html">Energy regions</a>
-    <a href="../index.html">River map</a>
-    <span class="swlab">3D terrain:</span>
-    __SWITCH__
+  energy panel is on the region page.</div>
+    <div id="live"></div>
   </div>
 </div>
-<button id="vrbtn" type="button">Enter VR</button>
-<div class="card" id="tstat">Loading 3D tiles…</div>
-<div id="credits">Basemap: Google Maps · 3D tiles access: Cesium ion · Prices: HydroTwin Energy</div>
+<div id="links">
+  <a href="__RID__.html">← Region page</a>
+  <a href="index.html">Energy regions</a>
+  <a href="../index.html">River map</a>
+  __SWITCH__
+</div>
+<button id="vrbtn" type="button">ENTER VR</button>
+<div id="status">Loading 3D tiles…</div>
+<div id="attr">Basemap: Google Maps · 3D tiles access: Cesium ion · Prices: HydroTwin Energy</div>
+<script>
+document.getElementById('hud-tg').addEventListener('click', function () {
+  var hud = document.getElementById('hud');
+  hud.classList.toggle('min');
+  this.textContent = hud.classList.contains('min') ? '+' : '–';
+});
+</script>
 <script src="data.js"></script>
 <script>
   (function () {
     var R = window.HTE_DATA.regions.find(function (r) { return r.id === "__RID__"; });
     var f = R.forecast.slice(0, 3).map(function (x) {
-      return '<div class="row"><span>' + x.date + '</span><b>$' + x.pred.toFixed(2) + '/MWh</b></div>';
+      return '<div><b>Forecast ' + x.date + '</b> $' + x.pred.toFixed(2) + '/MWh</div>';
     }).join("");
     document.getElementById("live").innerHTML =
-      '<div class="row"><span>Latest price (' + R.latest.last_price_date + ')</span><b>$' +
-      R.latest.last_price.toFixed(2) + '/MWh</b></div>' + f +
-      '<div class="row"><span>Forecast issued</span><b>' + R.forecast_origin + '</b></div>';
+      '<div><b>Latest price</b> $' + R.latest.last_price.toFixed(2) + '/MWh · ' +
+      R.latest.last_price_date + '</div>' + f +
+      '<div><b>Forecast issued</b> ' + R.forecast_origin + '</div>';
   })();
 </script>
 <script type="module">
-  const stat = document.getElementById("tstat");
+  const stat = document.getElementById("status");
   const LAT = __LATV__, LON = __LONV__, ELEV = __ELEVV__, GEOID = __GEOIDV__;
   window.addEventListener("error", function (e) {
     stat.textContent = "3D scene error: " + (e.message || "failed to load") +
@@ -483,7 +524,7 @@ SCENE_PAGE = r"""<!doctype html>
     renderer.xr.enabled = true;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const scene = new T3.Scene();
-    scene.background = new T3.Color(0x0b1622);
+    scene.background = new T3.Color(0x0e1a24);
     const camera = new T3.PerspectiveCamera(55, 1, 1, 30000);
     // local East/Up/South frame at the hub, same construction as the river
     // 3D pages (ht-tiles3d v1): tiles are placed by an ECEF->local matrix,
@@ -605,9 +646,9 @@ SCENE_PAGE = r"""<!doctype html>
             if (cur) { cur.end(); return; }
             const session = await navigator.xr.requestSession("immersive-vr",
               { optionalFeatures: ["local-floor", "bounded-floor"] });
-            session.addEventListener("end", () => { vrbtn.textContent = "Enter VR"; });
+            session.addEventListener("end", () => { vrbtn.textContent = "ENTER VR"; });
             await renderer.xr.setSession(session);
-            vrbtn.textContent = "Exit VR";
+            vrbtn.textContent = "EXIT VR";
           } catch (e) {
             stat.textContent = "VR session failed: " +
               String(e && e.message || e).slice(0, 160);
@@ -642,6 +683,7 @@ def scene_page(rid, token):
     name = dict(REGIONS)[rid]
     s = SCENE_PAGE
     s = s.replace("__TOKEN__", token)
+    s = s.replace("__SCENE_CSS__", SCENE_CSS)
     s = s.replace("__NAME__", name)
     s = s.replace("__PLACE__", g["place"])
     s = s.replace("__NOTE__", g["note"])
@@ -653,7 +695,7 @@ def scene_page(rid, token):
     s = s.replace("__GEOIDV__", repr(g["geoid"]))
     s = s.replace("__RID__", rid)
     switch = "".join(
-        f'<button type="button" disabled style="background:#2E9B57;border-color:#7AE07A;cursor:default">{n} · this scene</button>'
+        f'<button type="button" class="on">{n} · this scene</button>'
         if o == rid else
         f'<a href="{o}-3d.html">{n} 3D terrain</a>'
         for o, n in REGIONS)
