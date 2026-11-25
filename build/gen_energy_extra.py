@@ -91,51 +91,6 @@ GROUPS = {
 }
 
 
-def _cost_anchors_json():
-    """The parsed power-plant cost workbook (cost_anchors.json next to
-    the energy pipeline), or None when the file is absent."""
-    p = Path(P.__file__).resolve().parent / "cost_anchors.json"
-    if p.exists():
-        return json.loads(p.read_text())
-    return getattr(P, "COST_ANCHORS", None)
-
-
-def cost_anchor_panel(F):
-    """Per-region generation cost anchors: this hub's observed price
-    distribution over its full priced record, and the implied gas
-    marginal-cost series (workbook EIA heat rates x the daily Henry
-    Hub price + variable O&M) over the last 90 priced days, next to
-    the hub price itself — the spark-spread relationship. Static
-    workbook values (LCOE bands, capital costs) are shared across
-    regions and exported once as extra['cost_workbook'] in main()."""
-    CA = _cost_anchors_json()
-    if not CA:
-        return None
-    price = F["price"].dropna()
-    if len(price) < 30:
-        return None
-    dist = dict(mean=round(float(price.mean()), 2),
-                p10=round(float(price.quantile(0.10)), 2),
-                p50=round(float(price.quantile(0.50)), 2),
-                p90=round(float(price.quantile(0.90)), 2),
-                n=int(len(price)), first=str(price.index[0].date()),
-                last=str(price.index[-1].date()))
-    techs = CA["gas_marginal_cost"]["techs"]
-    days = price.index[-90:]
-    gv = F["gas"].reindex(days)
-    rows = []
-    for i, d in enumerate(days):
-        g = gv.iloc[i]
-        row = dict(d=str(d.date()), price=round(float(price.loc[d]), 2),
-                   gas=(round(float(g), 3) if np.isfinite(g) else None))
-        for t in techs:
-            row[f"mc_{t['key']}"] = (
-                round(t["heat_rate_btu_kwh"] / 1000.0 * float(g)
-                      + t["vom_usd_mwh"], 2) if np.isfinite(g) else None)
-        rows.append(row)
-    return dict(dist=dist, mc_series=rows)
-
-
 # --------------------------------------------------------------------------
 # Longer-horizon outlooks (weekly / monthly / yearly), market regimes and the
 # forecast surface. Everything below is computed from the same region frame F
@@ -779,9 +734,6 @@ def region_extras(rid, cfg, F, D):
     origins = D["origins"]
     feats = D["feats"]
     groups = dict(GROUPS)
-    mc_cols = [f for f in feats if f.startswith("mc_")]
-    if mc_cols:
-        groups["Implied marginal cost — gas CC & peaking (cost workbook)"] = mc_cols
     split = D["split"]
     train_idx = D["train_idx"]
     hold_idx = D["hold_idx"]
@@ -860,7 +812,6 @@ def region_extras(rid, cfg, F, D):
                     mae=round(ea["mae"], 2), base_mae=round(base["mae"], 2),
                     delta_mae=round(ea["mae"] - base["mae"], 2))
     out["backtest"] = backtest
-    out["cost_anchors"] = cost_anchor_panel(F)
     out["featimp_ridge"] = featimp
     out["check_metrics"] = check
     out["ablation"] = ablation
@@ -995,22 +946,6 @@ def main():
         generator="gen_energy_extra.py — the energy pipeline's own training code, "
                   "re-run on its cached raw data as part of the merged build",
         sanity_vs_shipped=sanity, regions=meta_regions)
-    # ---- shared cost-workbook block for the Generation cost anchors
-    # panels (parsed from the user's workbook; static per-technology
-    # values, exported once — the per-region parts live in each
-    # region's cost_anchors). Added AFTER build_meta on purpose: the
-    # metadata loop above iterates extra's region entries.
-    CA = _cost_anchors_json()
-    if CA:
-        extra["cost_workbook"] = dict(
-            source_workbook=CA["source_workbook"],
-            eia_source=CA["eia_sheet_source"],
-            lazard_source=CA["lazard_sheet_source"],
-            gas_mc=CA["gas_marginal_cost"], bands=CA["lcoe_bands"],
-            lazard=CA["lazard"], eia_overnight=CA["eia_overnight"],
-            real_projects=CA["real_projects"],
-            smr_range=CA["smr_real_project_range"],
-            sources=CA["sources"])
     out = Path(__file__).parent / "energy_extra.js"
     out.write_text("window.HTE_EXTRA = " + json.dumps(extra) + ";\n")
     print("wrote", out, out.stat().st_size, "bytes")
