@@ -93,6 +93,11 @@ a.hts-navbtn.on{background:#23466E}
 # river station 3D page's first style block.
 SCENE_CSS = _river_css_block("height:100%;overflow:hidden",
                              src="stations/USGS-01463500-3d.html")
+# River PANELS bar (ht-lazypanels), verbatim from the river 3D page: the
+# energy scene pages carry the same bottom bar in its 3D placement
+# (#htlp-bar.htlp-bar3d), with energy panel buttons.
+LAZYPANELS_CSS = _river_css_block("/* ht-lazypanels v1 */",
+                                  src="stations/USGS-01463500-3d.html")
 
 # Real hub geography for the 3D scene pages. elev/geoid are approximate site
 # values used ONLY to seat the tile scene at local ground level (the same
@@ -444,9 +449,37 @@ SCENE_PAGE = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HydroTwin 3D · __NAME__</title>
 <style>__SCENE_CSS__
+__LAZY_CSS__
  #scene{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
  #vrbtn{position:absolute;bottom:20px;left:calc(50% - 60px);width:120px;padding:12px 6px;border:1px solid #fff;border-radius:4px;background:rgba(0,0,0,.1);color:#fff;font:normal 13px sans-serif;text-align:center;opacity:.5;outline:none;z-index:999;cursor:pointer;display:none}
  #vrbtn:hover{opacity:1}
+ /* ht-energy-scene v1 — river-chrome additions for the energy 3D pages:
+    forecast playback bar, floating panels over the scene, hub price lines.
+    Colours and chrome follow the river 3D pages (#hud/#links/#fcb/#htlp-bar). */
+ #fcctl{position:fixed;left:50%;top:64px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;padding:7px 9px;border-radius:10px;background:rgba(12,18,28,.88);z-index:6;max-width:min(94vw,760px)}
+ #fcctl button,#fcctl select{padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.22);background:#23466E;color:#E6EDF5;font:600 12.5px Arial;cursor:pointer}
+ #fcctl button.on{background:#2E9B57;border-color:#7AE07A;color:#fff}
+ #fcctl .rd{font:600 12.5px Arial;color:#FFD24D;white-space:nowrap}
+ #fcctl .lb{font:700 11px Arial;color:#8FC1F2;letter-spacing:.05em}
+ #fcb{top:112px}
+ .hte-panel{position:fixed;z-index:6;background:rgba(12,18,28,.93);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.5;color:#E6EDF5;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+ .hte-panel h3{margin:0 0 8px;font-size:13.5px;color:#fff}
+ .hte-panel .note{color:#9FB3C8;font-size:11.5px;margin-top:8px}
+ .hte-off{display:none !important}
+ #pnl-fc,#pnl-hist{left:12px;bottom:120px;width:min(560px,94vw)}
+ #pnl-cmp,#pnl-data{right:14px;top:150px;width:min(640px,94vw);max-height:64vh;overflow:auto}
+ .hte-panel canvas{width:100%;height:auto;display:block;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.12);border-radius:8px}
+ .hte-tbl{border-collapse:collapse;width:100%;font-size:12px;margin-top:6px}
+ .hte-tbl th,.hte-tbl td{border-bottom:1px solid rgba(255,255,255,.12);padding:2px 6px;text-align:right}
+ .hte-tbl th:first-child,.hte-tbl td:first-child{text-align:left}
+ .hte-tbl tr.cur td{background:rgba(255,210,77,.16);color:#FFD24D;font-weight:600}
+ #hud .lfc{margin-top:5px;color:#FFD24D;font-weight:600}
+ @media (max-width:760px){
+   #fcctl{top:auto;bottom:196px}
+   #fcb{display:none !important}
+   #pnl-fc,#pnl-hist{left:8px;right:8px;bottom:196px;width:auto}
+   #pnl-cmp,#pnl-data{left:8px;right:8px;top:auto;bottom:196px;width:auto;max-height:52vh}
+ }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"},"scopes":{"../vendor3d/":{"three":"../vendor3d/three.module.min.js"}}}</script>
 </head>
@@ -458,11 +491,13 @@ SCENE_PAGE = r"""<!doctype html>
     <div>__PLACE__ · __LAT__, __LON__</div>
     <div>__NOTE__</div>
     <div>The gold pin marks the hub location in the same Google Photorealistic 3D Tiles
-  scene the river 3D pages use. A price hub has no gauge reach, water surface or
-  rating curve, so this scene carries the hub marker and the live price summary —
-  the forecasts, ribbons and flood layers stay on the river pages, and every
-  energy panel is on the region page.</div>
+  scene the river 3D pages use, and the gold label over the pin carries the price for
+  the selected forecast day. A price hub has no gauge reach, water surface or rating
+  curve, so this scene carries the hub marker, the forecast playback and the price
+  panels below — the full panel set (weekly, monthly and yearly outlooks, drift,
+  market regimes and more) stays on the region page.</div>
     <div id="live"></div>
+    <div class="lfc" id="live-fc"></div>
   </div>
 </div>
 <div id="links">
@@ -470,7 +505,40 @@ SCENE_PAGE = r"""<!doctype html>
   <a href="index.html">Energy regions</a>
   <a href="../index.html">River map</a>
   __SWITCH__
+  <button type="button" data-view="hub" class="on">Hub view</button><button type="button" data-view="wide">Wide view</button><button type="button" id="btn-panels" class="on">Panels</button>
 </div>
+<div id="fcctl" role="group" aria-label="Forecast playback">
+  <span class="lb">FORECAST</span>
+  <button type="button" id="fc-prev" title="Previous forecast day">◀</button>
+  <button type="button" id="fc-play">▶ Play</button>
+  <button type="button" id="fc-next" title="Next forecast day">▶</button>
+  <select id="fc-day" aria-label="Forecast day"></select>
+  <span class="rd" id="fc-read"></span>
+</div>
+<div id="fcb"></div>
+<div class="hte-panel hte-off" id="pnl-fc">
+  <h3>7-day price forecast — __NAME__</h3>
+  <canvas id="cv-sfc" width="760" height="300"></canvas>
+  <table class="hte-tbl" id="sfc-tbl"></table>
+  <p class="note" id="sfc-note"></p>
+</div>
+<div class="hte-panel hte-off" id="pnl-hist">
+  <h3>Price history — last 365 days</h3>
+  <canvas id="cv-shist" width="760" height="300"></canvas>
+  <p class="note" id="shist-note"></p>
+</div>
+<div class="hte-panel hte-off" id="pnl-cmp">
+  <h3>Model compare — holdout MAE $/MWh</h3>
+  <div id="scmp-wrap"></div>
+  <p class="note">Every roster model at every horizon, scored once on the time-based holdout; the model selected per horizon on validation is bold. Persistence is the anchor every model must beat. The same table is on the region page's Model compare panel.</p>
+</div>
+<div class="hte-panel hte-off" id="pnl-data">
+  <h3>Data &amp; models — __NAME__</h3>
+  <div id="sdata"></div>
+  <table class="hte-tbl" id="sdata-tbl"></table>
+  <p class="note">Energy data is re-pulled and the models are retrained inside the weekly merged build (Mondays, deploy-hydrotwin-merged-aws-v2), so this page serves the latest build's snapshot — there is no in-browser retraining on the energy pages. The river pages' retrain / load-new-model / old-weights controls have no energy equivalent; this panel shows the shipped build's own status instead.</p>
+</div>
+<div id="htlp-bar" class="htlp-bar3d" role="group" aria-label="Scene panels"><span class="htlp-t">PANELS</span><button type="button" class="htlp-btn" id="pb-fc" aria-pressed="false">7-day forecast</button><button type="button" class="htlp-btn" id="pb-hist" aria-pressed="false">Price history</button><button type="button" class="htlp-btn" id="pb-cmp" aria-pressed="false">Model compare</button><button type="button" class="htlp-btn" id="pb-data" aria-pressed="false">Data &amp; models</button></div>
 <button id="vrbtn" type="button">ENTER VR</button>
 <div id="status">Loading 3D tiles…</div>
 <div id="attr">Basemap: Google Maps · 3D tiles access: Cesium ion · Prices: HydroTwin Energy</div>
@@ -482,17 +550,288 @@ document.getElementById('hud-tg').addEventListener('click', function () {
 });
 </script>
 <script src="data.js"></script>
+<script src="energy_extra.js"></script>
 <script>
-  (function () {
-    var R = window.HTE_DATA.regions.find(function (r) { return r.id === "__RID__"; });
-    var f = R.forecast.slice(0, 3).map(function (x) {
-      return '<div><b>Forecast ' + x.date + '</b> $' + x.pred.toFixed(2) + '/MWh</div>';
+/* ht-energy-scene v1 — forecast playback, panels and data wiring for the
+   energy 3D scene pages. Every number comes from the shipped site data:
+   data.js (window.HTE_DATA — latest price, the issued 7-day forecast with
+   its band, per-horizon metrics for the full roster) and energy_extra.js
+   (window.HTE_EXTRA — the full price series and build statistics). The
+   chart drawing follows the region pages' own outlook/history renderers. */
+(function () {
+  var D = window.HTE_DATA, X = window.HTE_EXTRA || {};
+  var R = D.regions.find(function (r) { return r.id === "__RID__"; });
+  var E = X["__RID__"] || {};
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (n, d) {
+    return (n === null || n === undefined || isNaN(n)) ? "—" : Number(n).toFixed(d === undefined ? 2 : d);
+  };
+  var BLUE = "#8FC1F2", GREEN = "#43D17C", GOLD = "#FFD24D", GREY = "#9FB3C8";
+  var MNAME = {};
+  (R.roster || []).forEach(function (m) { MNAME[m.key] = m.name; });
+  var mname = function (k) { return MNAME[k] || k; };
+  var FC = R.forecast || [];
+  var series = (E.series && E.series.length) ? E.series
+    : (R.history || []).map(function (p) { return { d: p.d, v: p.v }; });
+  var lastDate = (E.stats && E.stats.last_date) || R.latest.last_price_date;
+
+  /* ---------- HUD live block ---------- */
+  $("live").innerHTML =
+    '<div><b>Latest price</b> $' + fmt(R.latest.last_price) + '/MWh · ' + R.latest.last_price_date + '</div>' +
+    '<div><b>Data through</b> ' + lastDate + ' · refreshed weekly (Monday build)</div>' +
+    '<div><b>Forecast issued</b> ' + R.forecast_origin + ' · ' + FC.length + ' days (+1..+' + FC.length + ')</div>';
+
+  /* ---------- forecast playback ---------- */
+  var day = -1, playing = false, timer = null;   // day: -1 = latest price, 0..n-1 = forecast days
+  var sel = $("fc-day");
+  sel.innerHTML = '<option value="-1">Latest · ' + R.latest.last_price_date + '</option>' +
+    FC.map(function (f, i) {
+      return '<option value="' + i + '">Day +' + (i + 1) + ' · ' + f.date + '</option>';
     }).join("");
-    document.getElementById("live").innerHTML =
-      '<div><b>Latest price</b> $' + R.latest.last_price.toFixed(2) + '/MWh · ' +
-      R.latest.last_price_date + '</div>' + f +
-      '<div><b>Forecast issued</b> ' + R.forecast_origin + '</div>';
-  })();
+
+  function setLabel(l2) {
+    var lines = [R.name, l2];
+    window.__htEnergyLabelPending = lines;
+    if (window.__htEnergyLabel) window.__htEnergyLabel.set(lines[0], lines[1]);
+  }
+  function stopPlay() {
+    playing = false;
+    if (timer) { clearInterval(timer); timer = null; }
+    $("fc-play").textContent = "▶ Play";
+    $("fc-play").classList.remove("on");
+  }
+  function setDay(i) {
+    day = Math.max(-1, Math.min(FC.length - 1, i));
+    sel.value = String(day);
+    var read, hud, banner, lab;
+    if (day < 0) {
+      read = "Latest $" + fmt(R.latest.last_price) + "/MWh · " + R.latest.last_price_date;
+      hud = "Showing: latest price $" + fmt(R.latest.last_price) + "/MWh · " + R.latest.last_price_date;
+      banner = "";
+      lab = "$" + fmt(R.latest.last_price) + "/MWh · latest · " + R.latest.last_price_date;
+    } else {
+      var f = FC[day], m = R.metrics[day + 1] || {};
+      read = "Day +" + (day + 1) + " · " + f.date + " · $" + fmt(f.pred) + "/MWh";
+      hud = "Showing: forecast day +" + (day + 1) + " · " + f.date + " · $" + fmt(f.pred) +
+        "/MWh · band $" + fmt(f.lo) + " – $" + fmt(f.hi) +
+        (m.chosen ? " · model " + mname(m.chosen) : "");
+      banner = "Forecast day +" + (day + 1) + " of " + FC.length + " · " + f.date +
+        " · $" + fmt(f.pred) + "/MWh (band $" + fmt(f.lo) + " – $" + fmt(f.hi) + ")";
+      lab = "$" + fmt(f.pred) + "/MWh · +" + (day + 1) + "d · " + f.date;
+    }
+    $("fc-read").textContent = read;
+    $("live-fc").textContent = hud;
+    var b = $("fcb");
+    b.textContent = banner;
+    b.style.display = banner ? "block" : "none";
+    setLabel(lab);
+    var rows = $("sfc-tbl").rows;
+    for (var k = 0; k < rows.length; k++) rows[k].classList.toggle("cur", k - 1 === day);
+    if (drawn.fc) drawFcChart();
+  }
+  $("fc-prev").addEventListener("click", function () { stopPlay(); setDay(day - 1); });
+  $("fc-next").addEventListener("click", function () { stopPlay(); setDay(day + 1); });
+  sel.addEventListener("change", function () { stopPlay(); setDay(parseInt(sel.value, 10)); });
+  $("fc-play").addEventListener("click", function () {
+    if (playing) { stopPlay(); return; }
+    if (!FC.length) return;
+    playing = true;
+    $("fc-play").textContent = "❚❚ Pause";
+    $("fc-play").classList.add("on");
+    if (day >= FC.length - 1) setDay(-1);
+    timer = setInterval(function () {
+      if (day >= FC.length - 1) { stopPlay(); return; }
+      setDay(day + 1);
+    }, 1500);
+  });
+
+  /* ---------- canvas helpers (region-page style) ---------- */
+  function setup(cv) {
+    var ctx = cv.getContext("2d");
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    return [ctx, cv.width, cv.height];
+  }
+  function axes(ctx, W, H, pad, ymin, ymax) {
+    ctx.strokeStyle = "#22344C"; ctx.fillStyle = GREY; ctx.font = "11px Arial"; ctx.lineWidth = 1;
+    for (var i = 0; i <= 4; i++) {
+      var y = pad.t + (H - pad.t - pad.b) * i / 4, v = ymax - (ymax - ymin) * i / 4;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      ctx.fillText(fmt(v, Math.abs(ymax - ymin) < 3 ? 2 : 0), 4, y + 3);
+    }
+  }
+  function line(ctx, pts, X0, X1, Y0, Y1, color, width, dash) {
+    ctx.strokeStyle = color; ctx.lineWidth = width || 1.6; ctx.setLineDash(dash || []);
+    ctx.beginPath();
+    pts.forEach(function (p, i) {
+      var x = X0 + (X1 - X0) * p[0], y = Y1 - (Y1 - Y0) * p[1];
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  /* ---------- 7-day forecast panel ---------- */
+  var drawn = { fc: false, hist: false };
+  function drawFcChart() {
+    var cv = $("cv-sfc"); if (!cv) return;
+    var s = setup(cv), ctx = s[0], W = s[1], H = s[2];
+    var pad = { l: 52, r: 10, t: 10, b: 22 };
+    var tail = series.slice(-30), fc = FC;
+    var all = tail.map(function (p) { return p.v; })
+      .concat(fc.map(function (f) { return f.hi; }), fc.map(function (f) { return f.lo; }));
+    var ymin = Math.min.apply(null, all), ymax = Math.max.apply(null, all);
+    var mg = (ymax - ymin) * .08 || 1; ymin -= mg; ymax += mg;
+    axes(ctx, W, H, pad, ymin, ymax);
+    var X0 = pad.l, X1 = W - pad.r, Y0 = pad.t, Y1 = H - pad.b, N = tail.length + fc.length;
+    var fx = function (i) { return i / (N - 1); }, fy = function (v) { return (v - ymin) / (ymax - ymin); };
+    ctx.fillStyle = "rgba(67,209,124,.13)"; ctx.beginPath();
+    fc.forEach(function (f, i) {
+      var x = X0 + (X1 - X0) * fx(tail.length + i), y = Y1 - (Y1 - Y0) * fy(f.hi);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    fc.slice().reverse().forEach(function (f, i) {
+      var x = X0 + (X1 - X0) * fx(tail.length + fc.length - 1 - i), y = Y1 - (Y1 - Y0) * fy(f.lo);
+      ctx.lineTo(x, y);
+    });
+    ctx.closePath(); ctx.fill();
+    line(ctx, tail.map(function (p, i) { return [fx(i), fy(p.v)]; }), X0, X1, Y0, Y1, BLUE, 1.5);
+    line(ctx, [[fx(tail.length - 1), fy(tail[tail.length - 1].v)]].concat(
+      fc.map(function (f, i) { return [fx(tail.length + i), fy(f.pred)]; })), X0, X1, Y0, Y1, GREEN, 1.8);
+    if (day >= 0 && fc[day]) {
+      var mx = X0 + (X1 - X0) * fx(tail.length + day);
+      ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(mx, Y0); ctx.lineTo(mx, Y1); ctx.stroke(); ctx.setLineDash([]);
+      var my = Y1 - (Y1 - Y0) * fy(fc[day].pred);
+      ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(mx, my, 4.5, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = GREY;
+    ctx.fillText("issued " + R.forecast_origin, X0 + 2, H - 6);
+    if (fc.length) ctx.fillText(fc[fc.length - 1].date, X1 - 62, H - 6);
+    drawn.fc = true;
+  }
+  $("sfc-tbl").innerHTML =
+    "<tr><th>Day</th><th>Date</th><th>Forecast $/MWh</th><th>Band low</th><th>Band high</th><th>Model</th></tr>" +
+    '<tr><td>Latest</td><td>' + R.latest.last_price_date + '</td><td>' + fmt(R.latest.last_price) +
+    '</td><td>—</td><td>—</td><td>—</td></tr>' +
+    FC.map(function (f, i) {
+      var m = R.metrics[i + 1] || {};
+      return '<tr><td>+' + (i + 1) + 'd</td><td>' + f.date + '</td><td>' + fmt(f.pred) + '</td><td>' +
+        fmt(f.lo) + '</td><td>' + fmt(f.hi) + '</td><td>' + (m.chosen ? mname(m.chosen) : "—") + '</td></tr>';
+    }).join("");
+  $("sfc-note").textContent = "Issued " + R.forecast_origin + " from the last observed price (" +
+    R.latest.last_price_date + "). Band: ±1.2816 × per-horizon holdout residual σ — the energy twin's " +
+    "published interval method. Step through the days with the FORECAST controls at the top of the scene.";
+
+  /* ---------- price history panel ---------- */
+  function drawHistChart() {
+    var cv = $("cv-shist"); if (!cv) return;
+    var s = setup(cv), ctx = s[0], W = s[1], H = s[2];
+    var pad = { l: 52, r: 10, t: 10, b: 22 };
+    var ser = series.slice(-365);
+    var vs = ser.map(function (p) { return p.v; });
+    var ymin = Math.min.apply(null, vs), ymax = Math.max.apply(null, vs);
+    axes(ctx, W, H, pad, ymin, ymax);
+    var X0 = pad.l, X1 = W - pad.r, Y0 = pad.t, Y1 = H - pad.b;
+    line(ctx, ser.map(function (p, i) {
+      return [i / (ser.length - 1), (p.v - ymin) / ((ymax - ymin) || 1)];
+    }), X0, X1, Y0, Y1, BLUE, 1.3);
+    ctx.fillStyle = GREY; ctx.font = "11px Arial";
+    for (var i = 0; i < 4; i++) {
+      var k = Math.floor((ser.length - 1) * i / 3);
+      ctx.fillText(ser[k].d, X0 + (X1 - X0) * i / 3 - 26, H - 6);
+    }
+    var hi = ser.findIndex(function (p) { return p.d >= R.holdout_start; });
+    if (hi > 0) {
+      var x = X0 + (X1 - X0) * hi / (ser.length - 1);
+      ctx.fillStyle = "rgba(255,210,77,.07)"; ctx.fillRect(x, Y0, X1 - x, Y1 - Y0);
+      ctx.fillStyle = GOLD; ctx.fillText("holdout →", x + 4, Y0 + 12);
+    }
+    drawn.hist = true;
+  }
+  $("shist-note").textContent = "Full record " + series[0].d + " → " + series[series.length - 1].d +
+    " · " + series.length + " priced days" +
+    (E.stats ? " · mean $" + fmt(E.stats.mean) + " · median $" + fmt(E.stats.median) +
+      " · min $" + fmt(E.stats.min) + " · max $" + fmt(E.stats.max) : "") +
+    ". The shaded span is the time-based holdout the shipped metrics were scored on.";
+
+  /* ---------- model compare panel ---------- */
+  var MH = [1, 2, 3, 4, 5, 6, 7];
+  var cmpRows = (R.roster || []).map(function (rm) {
+    var cells = MH.map(function (h) {
+      var mm = (R.metrics[h].models || {})[rm.key];
+      var sel2 = R.metrics[h].chosen === rm.key;
+      if (!mm) return "<td>—</td>";
+      if (mm.status !== "ok") return "<td>failed</td>";
+      return "<td>" + (sel2 ? "<b>" : "") + fmt(mm.mae) + (sel2 ? "</b>" : "") + "</td>";
+    }).join("");
+    return "<tr><td>" + rm.name + "</td>" + cells + "</tr>";
+  }).join("");
+  $("scmp-wrap").innerHTML = '<table class="hte-tbl"><tr><th>Model — holdout MAE $/MWh</th>' +
+    MH.map(function (h) { return "<th>+" + h + "d</th>"; }).join("") + "</tr>" + cmpRows +
+    '<tr><td>Persistence (anchor)</td>' +
+    MH.map(function (h) { return "<td>" + fmt(R.metrics[h].pers_mae) + "</td>"; }).join("") + "</tr></table>";
+
+  /* ---------- data & models panel ---------- */
+  $("sdata").innerHTML =
+    '<div><b>Snapshot</b> ' + D.meta.snapshot_date + ' · data window ' + D.meta.data_window + '</div>' +
+    '<div><b>Prices through</b> ' + lastDate + ' · ' + series.length + ' priced days (' +
+    series[0].d + ' → ' + series[series.length - 1].d + ')</div>' +
+    '<div><b>Forecast issued</b> ' + R.forecast_origin + ' · ' + FC.length + ' days ahead</div>' +
+    '<div><b>Holdout from</b> ' + R.holdout_start + ' · ' + R.holdout_origins + ' holdout origins of ' +
+    R.n_origins + '</div>' +
+    '<div style="margin-top:6px"><b>Chosen model per horizon</b> (selected on validation, scored once on the holdout):</div>';
+  $("sdata-tbl").innerHTML =
+    "<tr><th>Horizon</th><th>Model</th><th>MAE $</th><th>RMSE $</th><th>R²</th><th>Persistence MAE $</th><th>Skill</th><th>n</th></tr>" +
+    MH.map(function (h) {
+      var m = R.metrics[h];
+      return '<tr><td>+' + h + 'd</td><td>' + mname(m.chosen) + '</td><td>' + fmt(m.mae) + '</td><td>' +
+        fmt(m.rmse) + '</td><td>' + fmt(m.r2, 3) + '</td><td>' + fmt(m.pers_mae) + '</td><td>' +
+        fmt(m.skill_pct, 1) + '%</td><td>' + m.n + '</td></tr>';
+    }).join("");
+
+  /* ---------- panels bar (river ht-lazypanels semantics) ---------- */
+  var PANELS = [
+    ["pb-fc", "pnl-fc", function () { drawFcChart(); }],
+    ["pb-hist", "pnl-hist", function () { drawHistChart(); }],
+    ["pb-cmp", "pnl-cmp", null],
+    ["pb-data", "pnl-data", null]
+  ];
+  PANELS.forEach(function (p) {
+    var btn = $(p[0]), el = $(p[1]);
+    if (!btn || !el) return;
+    btn.addEventListener("click", function () {
+      var opening = el.classList.contains("hte-off");
+      if (opening) {
+        el.classList.remove("hte-off");
+        btn.classList.add("htlp-on"); btn.setAttribute("aria-pressed", "true");
+        if (p[2]) p[2]();
+      } else {
+        el.classList.add("hte-off");
+        btn.classList.remove("htlp-on"); btn.setAttribute("aria-pressed", "false");
+      }
+    });
+  });
+  $("btn-panels").addEventListener("click", function () {
+    var bar = $("htlp-bar"), hide = bar.style.display !== "none";
+    bar.style.display = hide ? "none" : "";
+    this.classList.toggle("on", !hide);
+    if (hide) PANELS.forEach(function (p) {
+      var el = $(p[1]), btn = $(p[0]);
+      if (el) el.classList.add("hte-off");
+      if (btn) { btn.classList.remove("htlp-on"); btn.setAttribute("aria-pressed", "false"); }
+    });
+  });
+
+  /* ---------- view presets (river Drone/Riverbank equivalents) ---------- */
+  document.querySelectorAll("#links [data-view]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#links [data-view]").forEach(function (o) { o.classList.remove("on"); });
+      b.classList.add("on");
+      if (window.__htEnergyView) window.__htEnergyView.set(b.getAttribute("data-view"));
+    });
+  });
+
+  setDay(-1);
+})();
 </script>
 <script type="module">
   const stat = document.getElementById("status");
@@ -567,6 +906,37 @@ document.getElementById('hud-tg').addEventListener('click', function () {
     const ring = new T3.Mesh(new T3.RingGeometry(38, 46, 48),
       new T3.MeshBasicMaterial({ color: 0xffd24d, side: T3.DoubleSide }));
     ring.rotation.x = -Math.PI / 2; ring.position.set(0, 2, 0); scene.add(ring);
+    // hub label — the river 3D pages carry a gold gauge label over the
+    // scene (dark navy text on rgba(255,210,77,0.95)) whose text follows
+    // the forecast day being shown; the energy equivalent is this canvas
+    // sprite above the hub pin, redrawn by the scene UI script through
+    // window.__htEnergyLabel whenever the selected day changes.
+    const labelCanvas = document.createElement("canvas");
+    labelCanvas.width = 640; labelCanvas.height = 160;
+    const labelTex = new T3.CanvasTexture(labelCanvas);
+    const labelSprite = new T3.Sprite(new T3.SpriteMaterial(
+      { map: labelTex, transparent: true }));
+    labelSprite.scale.set(340, 85, 1);
+    labelSprite.position.set(0, 245, 0);
+    scene.add(labelSprite);
+    function drawHubLabel(l1, l2) {
+      const g = labelCanvas.getContext("2d");
+      g.clearRect(0, 0, 640, 160);
+      g.fillStyle = "rgba(255,210,77,0.95)";
+      g.beginPath();
+      if (g.roundRect) g.roundRect(6, 6, 628, 148, 26); else g.rect(6, 6, 628, 148);
+      g.fill();
+      g.fillStyle = "#13233A"; g.textAlign = "center";
+      g.font = "700 46px Arial"; g.fillText(l1, 320, 68);
+      g.font = "600 39px Arial"; g.fillText(l2, 320, 126);
+      labelTex.needsUpdate = true;
+    }
+    window.__htEnergyLabel = { set: drawHubLabel };
+    drawHubLabel("__NAME__", "loading prices…");
+    if (window.__htEnergyLabelPending) {
+      const p = window.__htEnergyLabelPending;
+      drawHubLabel(p[0], p[1]);
+    }
     // simple orbit controls (drag / wheel / touch), target at the hub
     let az = 0.7, el = 0.9, dist = 2100;
     const target = new T3.Vector3(0, 0, 0);
@@ -610,6 +980,14 @@ document.getElementById('hud-tg').addEventListener('click', function () {
     }
     window.addEventListener("resize", resize);
     resize(); placeCam();
+    // camera view presets, wired to the Hub view / Wide view buttons in
+    // #links (the energy equivalents of the river pages' Drone /
+    // Riverbank view buttons).
+    window.__htEnergyView = { set: function (v) {
+      if (v === "wide") { az = 0.7; el = 0.55; dist = 5200; }
+      else { az = 0.7; el = 0.9; dist = 2100; }
+      placeCam();
+    } };
     // Enter VR: the button appears only when an immersive-vr session is
     // available. On session start the camera drops to eye height near
     // the hub pin; the desktop orbit position is restored on exit.
@@ -670,6 +1048,7 @@ def scene_page(rid, token):
     name = dict(REGIONS)[rid]
     s = SCENE_PAGE
     s = s.replace("__TOKEN__", token)
+    s = s.replace("__LAZY_CSS__", LAZYPANELS_CSS)
     s = s.replace("__SCENE_CSS__", SCENE_CSS)
     s = s.replace("__NAME__", name)
     s = s.replace("__PLACE__", g["place"])
