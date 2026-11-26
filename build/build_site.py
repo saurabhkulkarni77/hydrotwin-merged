@@ -456,12 +456,11 @@ __LAZY_CSS__
  /* ht-energy-scene v1 — river-chrome additions for the energy 3D pages:
     forecast playback bar, floating panels over the scene, hub price lines.
     Colours and chrome follow the river 3D pages (#hud/#links/#fcb/#htlp-bar). */
- #fcctl{position:fixed;left:50%;top:64px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;padding:7px 9px;border-radius:10px;background:rgba(12,18,28,.88);z-index:6;max-width:min(94vw,760px)}
+ #hud #fcctl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:7px 8px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
  #fcctl button,#fcctl select{padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.22);background:#23466E;color:#E6EDF5;font:600 12.5px Arial;cursor:pointer}
  #fcctl button.on{background:#2E9B57;border-color:#7AE07A;color:#fff}
  #fcctl .rd{font:600 12.5px Arial;color:#FFD24D;white-space:nowrap}
  #fcctl .lb{font:700 11px Arial;color:#8FC1F2;letter-spacing:.05em}
- #fcb{top:112px}
  .hte-panel{position:fixed;z-index:6;background:rgba(12,18,28,.93);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.5;color:#E6EDF5;box-shadow:0 8px 30px rgba(0,0,0,.45)}
  .hte-panel h3{margin:0 0 8px;font-size:13.5px;color:#fff}
  .hte-panel .note{color:#9FB3C8;font-size:11.5px;margin-top:8px}
@@ -475,10 +474,8 @@ __LAZY_CSS__
  .hte-tbl tr.cur td{background:rgba(255,210,77,.16);color:#FFD24D;font-weight:600}
  #hud .lfc{margin-top:5px;color:#FFD24D;font-weight:600}
  @media (max-width:760px){
-   #fcctl{top:auto;bottom:196px}
-   #fcb{display:none !important}
-   #pnl-fc,#pnl-hist{left:8px;right:8px;bottom:196px;width:auto}
-   #pnl-cmp,#pnl-data{left:8px;right:8px;top:auto;bottom:196px;width:auto;max-height:52vh}
+   #pnl-fc,#pnl-hist{left:8px;right:8px;bottom:120px;width:auto}
+   #pnl-cmp,#pnl-data{left:8px;right:8px;top:auto;bottom:120px;width:auto;max-height:52vh}
  }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"},"scopes":{"../vendor3d/":{"three":"../vendor3d/three.module.min.js"}}}</script>
@@ -498,6 +495,14 @@ __LAZY_CSS__
   market regimes and more) stays on the region page.</div>
     <div id="live"></div>
     <div class="lfc" id="live-fc"></div>
+    <div id="fcctl" role="group" aria-label="Forecast playback">
+      <span class="lb">FORECAST</span>
+      <button type="button" id="fc-prev" title="Previous forecast day">◀</button>
+      <button type="button" id="fc-play">▶ Play</button>
+      <button type="button" id="fc-next" title="Next forecast day">▶</button>
+      <select id="fc-day" aria-label="Forecast day"></select>
+      <span class="rd" id="fc-read"></span>
+    </div>
   </div>
 </div>
 <div id="links">
@@ -506,14 +511,6 @@ __LAZY_CSS__
   <a href="../index.html">River map</a>
   __SWITCH__
   <button type="button" data-view="hub" class="on">Hub view</button><button type="button" data-view="wide">Wide view</button><button type="button" id="btn-panels" class="on">Panels</button>
-</div>
-<div id="fcctl" role="group" aria-label="Forecast playback">
-  <span class="lb">FORECAST</span>
-  <button type="button" id="fc-prev" title="Previous forecast day">◀</button>
-  <button type="button" id="fc-play">▶ Play</button>
-  <button type="button" id="fc-next" title="Next forecast day">▶</button>
-  <select id="fc-day" aria-label="Forecast day"></select>
-  <span class="rd" id="fc-read"></span>
 </div>
 <div id="fcb"></div>
 <div class="hte-panel hte-off" id="pnl-fc">
@@ -626,7 +623,7 @@ document.getElementById('hud-tg').addEventListener('click', function () {
     b.style.display = banner ? "block" : "none";
     setLabel(lab);
     var rows = $("sfc-tbl").rows;
-    for (var k = 0; k < rows.length; k++) rows[k].classList.toggle("cur", k - 1 === day);
+    for (var k = 0; k < rows.length; k++) rows[k].classList.toggle("cur", k - 2 === day);
     if (drawn.fc) drawFcChart();
   }
   $("fc-prev").addEventListener("click", function () { stopPlay(); setDay(day - 1); });
@@ -927,8 +924,15 @@ document.getElementById('hud-tg').addEventListener('click', function () {
       if (g.roundRect) g.roundRect(6, 6, 628, 148, 26); else g.rect(6, 6, 628, 148);
       g.fill();
       g.fillStyle = "#13233A"; g.textAlign = "center";
-      g.font = "700 46px Arial"; g.fillText(l1, 320, 68);
-      g.font = "600 39px Arial"; g.fillText(l2, 320, 126);
+      var fit = function (txt, weight, size) {
+        var s = size;
+        g.font = weight + " " + s + "px Arial";
+        while (s > 24 && g.measureText(txt).width > 596) {
+          s -= 2; g.font = weight + " " + s + "px Arial";
+        }
+      };
+      fit(l1, "700", 46); g.fillText(l1, 320, 68);
+      fit(l2, "600", 39); g.fillText(l2, 320, 126);
       labelTex.needsUpdate = true;
     }
     window.__htEnergyLabel = { set: drawHubLabel };
